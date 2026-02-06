@@ -956,43 +956,112 @@ MiscTab:CreateToggle({
                         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
                         
                         local hrp = char:FindFirstChild("HumanoidRootPart")
-                        local collected = 0
+                        local originalPosition = hrp.Position
+                        local coinsFound = {}
                         
-                        -- Search for coins in workspace
+                        -- Comprehensive coin search
                         for _, obj in ipairs(workspace:GetDescendants()) do
-                            if obj:IsA("Part") and (obj.Name:find("Coin") or obj.Name:find("Money") or obj.BrickColor == BrickColor.new("Bright yellow")) then
-                                local coin = obj
-                                local distance = (coin.Position - hrp.Position).Magnitude
+                            local isCoin = false
+                            
+                            -- Multiple detection methods
+                            if obj:IsA("Part") or obj:IsA("MeshPart") then
+                                -- Check by name
+                                if obj.Name:lower():find("coin") or obj.Name:lower():find("money") or obj.Name:lower():find("cash") then
+                                    isCoin = true
+                                end
                                 
-                                -- If coin is within reasonable range, teleport to it and collect
-                                if distance <= 100 then -- Only farm coins within 100 studs
-                                    local originalPosition = hrp.Position
-                                    
-                                    -- Teleport to coin
-                                    hrp.Position = coin.Position
-                                    task.wait(0.2)
-                                    
-                                    -- Try to collect the coin (touch it)
-                                    coin.CanCollide = false
-                                    coin.Position = hrp.Position
-                                    task.wait(0.1)
-                                    
-                                    -- Return to original position
-                                    hrp.Position = originalPosition
-                                    collected = collected + 1
-                                    
-                                    -- Small delay between collections
-                                    task.wait(0.3)
-                                    
-                                    -- Break after collecting a few coins to avoid being too obvious
-                                    if collected >= 5 then
+                                -- Check by color (common coin colors)
+                                local colorsToCheck = {
+                                    BrickColor.new("Bright yellow"),
+                                    BrickColor.new("Yellow"),
+                                    BrickColor.new("New Yeller"),
+                                    BrickColor.new("Gold"),
+                                    BrickColor.new("Bright orange")
+                                }
+                                for _, color in ipairs(colorsToCheck) do
+                                    if obj.BrickColor == color then
+                                        isCoin = true
                                         break
                                     end
                                 end
+                                
+                                -- Check if it's a collectible (common MM2 coin properties)
+                                if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") then
+                                    if obj.Size.X <= 3 and obj.Size.Y <= 3 and obj.Size.Z <= 3 then -- Small parts are likely coins
+                                        isCoin = true
+                                    end
+                                end
+                            end
+                            
+                            if isCoin then
+                                local distance = (obj.Position - hrp.Position).Magnitude
+                                if distance <= 500 then -- Increased range to 500 studs
+                                    table.insert(coinsFound, {
+                                        coin = obj,
+                                        distance = distance,
+                                        position = obj.Position
+                                    })
+                                end
                             end
                         end
+                        
+                        -- Sort coins by distance (closest first)
+                        table.sort(coinsFound, function(a, b)
+                            return a.distance < b.distance
+                        end)
+                        
+                        -- Teleport to each coin and collect it
+                        for _, coinData in ipairs(coinsFound) do
+                            if not getgenv().CoinAutoFarmEnabled then break end -- Stop if disabled mid-farming
+                            
+                            local coin = coinData.coin
+                            if coin and coin.Parent then -- Make sure coin still exists
+                                -- Teleport directly to coin
+                                hrp.Position = coin.Position
+                                task.wait(0.1)
+                                
+                                -- Try multiple collection methods
+                                -- Method 1: Touch the coin
+                                coin.CanCollide = false
+                                coin.Position = hrp.Position
+                                task.wait(0.1)
+                                
+                                -- Method 2: Fire touch events if they exist
+                                if coin:FindFirstChild("TouchTransmitter") then
+                                    for _, connection in ipairs(coin.TouchTransmitter:GetConnectedChildren()) do
+                                        if connection:IsA("RemoteEvent") then
+                                            connection:FireServer()
+                                        end
+                                    end
+                                end
+                                
+                                -- Method 3: Click if click detector exists
+                                if coin:FindFirstChild("ClickDetector") then
+                                    coin.ClickDetector.MaxActivationDistance = 100
+                                    fireclickdetector(coin.ClickDetector)
+                                end
+                                
+                                -- Small delay between coins
+                                task.wait(0.2)
+                                
+                                -- Check if coin was collected (removed from workspace)
+                                if not coin.Parent then
+                                    -- Coin successfully collected
+                                else
+                                    -- Try alternative collection method
+                                    hrp.Position = coin.Position + Vector3.new(0, 2, 0)
+                                    task.wait(0.1)
+                                    hrp.Position = coin.Position
+                                    task.wait(0.1)
+                                end
+                            end
+                        end
+                        
+                        -- Return to original position
+                        hrp.Position = originalPosition
+                        task.wait(1) -- Wait before next cycle
                     end)
-                    task.wait(2) -- Check every 2 seconds
+                    task.wait(3) -- Check every 3 seconds
                 end
             end)()
         end
