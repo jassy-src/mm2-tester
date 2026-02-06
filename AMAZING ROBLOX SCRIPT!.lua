@@ -1,11 +1,294 @@
 -- Made by Jassy ❤
 -- Property of ScriptForge ❤
 
+-- Simple UI Creation (NO EXTERNAL DEPENDENCIES)
+local function createUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MM2Script"
+    screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Main Frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 500, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    mainFrame.BorderSizePixel = 2
+    mainFrame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+    mainFrame.Parent = screenGui
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "🔫 MM2 Script 🔫"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextScaled = true
+    title.Font = Enum.Font.SourceSansBold
+    title.Parent = mainFrame
+    
+    -- Tab Frame
+    local tabFrame = Instance.new("Frame")
+    tabFrame.Name = "TabFrame"
+    tabFrame.Size = UDim2.new(1, -10, 1, -50)
+    tabFrame.Position = UDim2.new(0, 5, 0, 40)
+    tabFrame.BackgroundTransparency = 1
+    tabFrame.Parent = mainFrame
+    
+    -- Tab Buttons
+    local tabs = {}
+    local tabNames = {"ESP", "Aimbot", "Misc", "Credits"}
+    
+    for i, tabName in ipairs(tabNames) do
+        local tabButton = Instance.new("TextButton")
+        tabButton.Name = "TabButton" .. i
+        tabButton.Size = UDim2.new(0, 120, 0, 30)
+        tabButton.Position = UDim2.new(0, 5 + (i-1) * 125, 0, 0)
+        tabButton.BackgroundColor3 = i == 1 and Color3.new(0.2, 0.2, 0.2) or Color3.new(0.1, 0.1, 0.1)
+        tabButton.BorderSizePixel = 1
+        tabButton.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+        tabButton.Text = tabName
+        tabButton.TextColor3 = Color3.new(1, 1, 1)
+        tabButton.TextScaled = true
+        tabButton.Font = Enum.Font.SourceSans
+        tabButton.Parent = tabFrame
+        
+        tabs[i] = tabButton
+    end
+    
+    -- Content Frame
+    local contentFrame = Instance.new("ScrollingFrame")
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, -10, 1, -80)
+    contentFrame.Position = UDim2.new(0, 5, 0, 70)
+    contentFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+    contentFrame.BorderSizePixel = 1
+    contentFrame.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+    contentFrame.Parent = mainFrame
+    
+    -- Content positioning
+    local contentY = 10
+    local function addElement(element)
+        element.Position = UDim2.new(0, 10, 0, contentY)
+        element.Parent = contentFrame
+        contentY = contentY + element.Size.Y.Offset + 5
+        return element
+    end
+    
+    -- Notification function
+    local function notify(title, content, duration)
+        local notification = Instance.new("Message")
+        notification.Text = title .. ": " .. content
+        notification.Duration = duration or 3
+        notification.Parent = game:GetService("StarterGui")
+    end
+    
+    return {
+        CreateTab = function(config)
+            return tabs[config.Index or 1]
+        end,
+        
+        ESP = tabs[1],
+        Aimbot = tabs[2],
+        Misc = tabs[3],
+        Credits = tabs[4],
+        
+        ContentFrame = contentFrame,
+        AddElement = addElement,
+        Notify = notify,
+        
+        CreateToggle = function(config)
+            local toggle = Instance.new("TextButton")
+            toggle.Size = UDim2.new(0, 200, 0, 30)
+            toggle.BackgroundColor3 = config.CurrentValue and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
+            toggle.BorderSizePixel = 1
+            toggle.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+            toggle.Text = config.Name or "Toggle"
+            toggle.TextColor3 = Color3.new(1, 1, 1)
+            toggle.TextScaled = true
+            toggle.Font = Enum.Font.SourceSans
+            toggle.Parent = contentFrame
+            
+            toggle.MouseButton1Click:Connect(function()
+                config.CurrentValue = not config.CurrentValue
+                toggle.BackgroundColor3 = config.CurrentValue and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
+                if config.Callback then
+                    config.Callback(config.CurrentValue)
+                end
+            end)
+            
+            return addElement(toggle)
+        end,
+        
+        CreateSlider = function(config)
+            local slider = Instance.new("Frame")
+            slider.Size = UDim2.new(0, 200, 0, 40)
+            slider.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+            slider.BorderSizePixel = 1
+            slider.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+            slider.Parent = contentFrame
+            
+            local sliderLabel = Instance.new("TextLabel")
+            sliderLabel.Size = UDim2.new(0, 180, 0, 20)
+            sliderLabel.Position = UDim2.new(0, 10, 0, 0)
+            sliderLabel.BackgroundTransparency = 1
+            sliderLabel.Text = config.Name or "Slider: " .. (config.CurrentValue or 0)
+            sliderLabel.TextColor3 = Color3.new(1, 1, 1)
+            sliderLabel.TextScaled = true
+            sliderLabel.Font = Enum.Font.SourceSans
+            sliderLabel.Parent = slider
+            
+            local sliderButton = Instance.new("TextButton")
+            sliderButton.Size = UDim2.new(0, 20, 1, 0)
+            sliderButton.Position = UDim2.new(0, 190, 0, 0)
+            sliderButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+            sliderButton.BorderSizePixel = 0
+            sliderButton.Text = "◀"
+            sliderButton.TextColor3 = Color3.new(1, 1, 1)
+            sliderButton.TextScaled = true
+            sliderButton.Font = Enum.Font.SourceSans
+            sliderButton.Parent = slider
+            
+            local sliderButton2 = Instance.new("TextButton")
+            sliderButton2.Size = UDim2.new(0, 20, 1, 0)
+            sliderButton2.Position = UDim2.new(0, 0, 0, 0)
+            sliderButton2.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+            sliderButton2.BorderSizePixel = 0
+            sliderButton2.Text = "▶"
+            sliderButton2.TextColor3 = Color3.new(1, 1, 1)
+            sliderButton2.TextScaled = true
+            sliderButton2.Font = Enum.Font.SourceSans
+            sliderButton2.Parent = slider
+            
+            sliderButton.MouseButton1Click:Connect(function()
+                local newValue = config.CurrentValue - (config.Increment or 1)
+                if newValue >= (config.Min or 0) then
+                    config.CurrentValue = newValue
+                    sliderLabel.Text = config.Name .. ": " .. config.CurrentValue
+                    if config.Callback then
+                        config.Callback(config.CurrentValue)
+                    end
+                end
+            end)
+            
+            sliderButton2.MouseButton1Click:Connect(function()
+                local newValue = config.CurrentValue + (config.Increment or 1)
+                if newValue <= (config.Max or 100) then
+                    config.CurrentValue = newValue
+                    sliderLabel.Text = config.Name .. ": " .. config.CurrentValue
+                    if config.Callback then
+                        config.Callback(config.CurrentValue)
+                    end
+                end
+            end)
+            
+            return addElement(slider)
+        end,
+        
+        CreateButton = function(config)
+            local button = Instance.new("TextButton")
+            button.Size = UDim2.new(0, 200, 0, 30)
+            button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+            button.BorderSizePixel = 1
+            button.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+            button.Text = config.Name or "Button"
+            button.TextColor3 = Color3.new(1, 1, 1)
+            button.TextScaled = true
+            button.Font = Enum.Font.SourceSans
+            button.Parent = contentFrame
+            
+            button.MouseButton1Click:Connect(config.Callback or function() end)
+            
+            return addElement(button)
+        end,
+        
+        CreateLabel = function(config)
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(0, 200, 0, 20)
+            label.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+            label.BorderSizePixel = 0
+            label.Text = config.Text or "Label"
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.TextScaled = true
+            label.Font = Enum.Font.SourceSans
+            label.Parent = contentFrame
+            
+            return addElement(label)
+        end,
+        
+        CreateDropdown = function(config)
+            local dropdown = Instance.new("TextButton")
+            dropdown.Size = UDim2.new(0, 200, 0, 30)
+            dropdown.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+            dropdown.BorderSizePixel = 1
+            dropdown.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+            dropdown.Text = (config.CurrentOption or config.Options[1]) .. " ▼"
+            dropdown.TextColor3 = Color3.new(1, 1, 1)
+            dropdown.TextScaled = true
+            dropdown.Font = Enum.Font.SourceSans
+            dropdown.Parent = contentFrame
+            
+            local isOpen = false
+            local optionsFrame = Instance.new("Frame")
+            optionsFrame.Size = UDim2.new(0, 200, 0, #config.Options * 25)
+            optionsFrame.Position = UDim2.new(0, 0, 0, 30)
+            optionsFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+            optionsFrame.BorderSizePixel = 1
+            optionsFrame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+            optionsFrame.Visible = false
+            optionsFrame.Parent = contentFrame
+            
+            for i, option in ipairs(config.Options) do
+                local optionButton = Instance.new("TextButton")
+                optionButton.Size = UDim2.new(1, -10, 0, 25)
+                optionButton.Position = UDim2.new(0, 5, 0, (i-1) * 25)
+                optionButton.BackgroundColor3 = option == (config.CurrentOption or config.Options[1]) and Color3.new(0, 0.5, 0) or Color3.new(0.1, 0.1, 0.1)
+                optionButton.BorderSizePixel = 0
+                optionButton.Text = option
+                optionButton.TextColor3 = Color3.new(1, 1, 1)
+                optionButton.TextScaled = true
+                optionButton.Font = Enum.Font.SourceSans
+                optionButton.Parent = optionsFrame
+                
+                optionButton.MouseButton1Click:Connect(function()
+                    config.CurrentOption = option
+                    dropdown.Text = option .. " ▼"
+                    isOpen = false
+                    optionsFrame.Visible = false
+                    if config.Callback then
+                        config.Callback(option)
+                    end
+                    
+                    -- Update button colors
+                    for _, child in pairs(optionsFrame:GetChildren()) do
+                        if child:IsA("TextButton") then
+                            child.BackgroundColor3 = child.Text == option and Color3.new(0, 0.5, 0) or Color3.new(0.1, 0.1, 0.1)
+                        end
+                    end
+                end)
+            end
+            
+            dropdown.MouseButton1Click:Connect(function()
+                isOpen = not isOpen
+                optionsFrame.Visible = isOpen
+            end)
+            
+            return addElement(dropdown)
+        end
+    }
+end
+
+-- Create UI
+local UI = createUI()
+print("UI Created Successfully")
+
 -- Anti-Cheat Bypass
 local function bypassAntiCheat()
-    -- Bypass "Invalid position" kick
-    if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+    local player = game.Players.LocalPlayer
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = player.Character.HumanoidRootPart
         
         -- Prevent position validation
         hrp.Changed:Connect(function(property)
@@ -21,170 +304,24 @@ local function bypassAntiCheat()
                 oldTeleport = hrp.Position
             end
         end)
-    end
-    
-    -- Bypass speed detection
-    game:GetService("RunService").Stepped:Connect(function()
-        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-            local humanoid = game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid.MoveDirection.Magnitude > 0 then
-                humanoid.WalkSpeed = math.min(humanoid.WalkSpeed, 50)
+        
+        -- Bypass speed detection
+        game:GetService("RunService").Stepped:Connect(function()
+            if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid.MoveDirection.Magnitude > 0 then
+                    humanoid.WalkSpeed = math.min(humanoid.WalkSpeed, 50)
+                end
             end
-        end
-    end)
-end
-
--- Test Rayfield UI Library
-local success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/kiwi3b/Roblox-UI-Libraries/main/Rayfield%20Source"))()
-end)
-
-if not success or not Rayfield then
-    -- Fallback UI Library
-    local success2, Rayfield = pcall(function()
-        return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-    end)
-    
-    if not success2 or not Rayfield then
-        -- Create simple UI if all else fails
-        Rayfield = {
-            CreateWindow = function(config)
-                local screenGui = Instance.new("ScreenGui")
-                screenGui.Name = "MM2Script"
-                screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-                
-                local mainFrame = Instance.new("Frame")
-                mainFrame.Name = "MainFrame"
-                mainFrame.Size = UDim2.new(0, 400, 0, 300)
-                mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-                mainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-                mainFrame.BorderSizePixel = 0
-                mainFrame.Parent = screenGui
-                
-                local title = Instance.new("TextLabel")
-                title.Name = "Title"
-                title.Size = UDim2.new(1, 0, 0, 30)
-                title.Position = UDim2.new(0, 0, 0, 0)
-                title.BackgroundTransparency = 1
-                title.Text = config.Name or "MM2 Script"
-                title.TextColor3 = Color3.new(1, 1, 1)
-                title.TextScaled = true
-                title.Font = Enum.Font.SourceSansBold
-                title.Parent = mainFrame
-                
-                return {
-                    CreateTab = function(tabConfig)
-                        local tabButton = Instance.new("TextButton")
-                        tabButton.Name = "TabButton"
-                        tabButton.Size = UDim2.new(0, 100, 0, 30)
-                        tabButton.Position = UDim2.new(0, 10, 0, 40)
-                        tabButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-                        tabButton.BorderSizePixel = 0
-                        tabButton.Text = tabConfig.Name or "Tab"
-                        tabButton.TextColor3 = Color3.new(1, 1, 1)
-                        tabButton.TextScaled = true
-                        tabButton.Font = Enum.Font.SourceSans
-                        tabButton.Parent = mainFrame
-                        
-                        return {
-                            CreateToggle = function(toggleConfig)
-                                local toggle = Instance.new("TextButton")
-                                toggle.Name = "Toggle"
-                                toggle.Size = UDim2.new(0, 80, 0, 25)
-                                toggle.Position = UDim2.new(0, 20, 0, 80)
-                                toggle.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-                                toggle.BorderSizePixel = 0
-                                toggle.Text = toggleConfig.Name or "Toggle"
-                                toggle.TextColor3 = Color3.new(1, 1, 1)
-                                toggle.TextScaled = true
-                                toggle.Font = Enum.Font.SourceSans
-                                toggle.Parent = mainFrame
-                                
-                                toggle.MouseButton1Click:Connect(function()
-                                    toggleConfig.Callback(not toggleConfig.CurrentValue)
-                                    toggleConfig.CurrentValue = not toggleConfig.CurrentValue
-                                    toggle.BackgroundColor3 = toggleConfig.CurrentValue and Color3.new(0, 0.5, 0) or Color3.new(0.3, 0.3, 0.3)
-                                end)
-                                
-                                return toggle
-                            end,
-                            
-                            CreateSlider = function(sliderConfig)
-                                local slider = Instance.new("Frame")
-                                slider.Name = "Slider"
-                                slider.Size = UDim2.new(0, 200, 0, 40)
-                                slider.Position = UDim2.new(0, 20, 0, 120)
-                                slider.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-                                slider.BorderSizePixel = 0
-                                slider.Parent = mainFrame
-                                
-                                local sliderButton = Instance.new("TextButton")
-                                sliderButton.Size = UDim2.new(0, 20, 1, 0)
-                                sliderButton.Position = UDim2.new(0, 0, 0, 0)
-                                sliderButton.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
-                                sliderButton.BorderSizePixel = 0
-                                sliderButton.Text = sliderConfig.Name or "Slider"
-                                sliderButton.TextColor3 = Color3.new(1, 1, 1)
-                                sliderButton.TextScaled = true
-                                sliderButton.Font = Enum.Font.SourceSans
-                                sliderButton.Parent = slider
-                                
-                                return slider
-                            end,
-                            
-                            CreateButton = function(buttonConfig)
-                                local button = Instance.new("TextButton")
-                                button.Name = "Button"
-                                button.Size = UDim2.new(0, 150, 0, 30)
-                                button.Position = UDim2.new(0, 20, 0, 170)
-                                button.BackgroundColor3 = Color3.new(0.4, 0.4, 0.4)
-                                button.BorderSizePixel = 0
-                                button.Text = buttonConfig.Name or "Button"
-                                button.TextColor3 = Color3.new(1, 1, 1)
-                                button.TextScaled = true
-                                button.Font = Enum.Font.SourceSans
-                                button.Parent = mainFrame
-                                
-                                button.MouseButton1Click:Connect(buttonConfig.Callback or function() end)
-                                
-                                return button
-                            end
-                        }
-                    end,
-                    
-                    CreateNotification = function(notifConfig)
-                        local notification = Instance.new("Message")
-                        notification.Text = notifConfig.Title or "Notification"
-                        notification.Duration = notifConfig.Duration or 3
-                        notification.Parent = game:GetService("StarterGui")
-                    end,
-                    
-                    Destroy = function()
-                        screenGui:Destroy()
-                    end
-                }
-            end
-        }
+        end)
     end
 end
 
-print(Rayfield and "[Rayfield loaded]" or "[Rayfield failed to load - Using fallback UI]")
-
--- Activate anti-cheat bypass
+-- Activate bypass
 bypassAntiCheat()
 
-local Window = Rayfield:CreateWindow({
-    Name = "🔫 MM2 Script 🔫",
-    LoadingTitle = "⚡ MM2 Script ⚡",
-    LoadingSubtitle = "❤ Made by Jassy ❤",
-    ConfigurationSaving = {
-        Enabled = false,
-    },
-    BackgroundImage = "https://i.imgur.com/f6P9Vci.jpeg"
-})
-
 -- ESP Tab 🎯
-local ESPTab = Window:CreateTab("🎯 ESP", 4483362458)
+local ESPTab = UI.ESP
 
 -- Role ESP Toggle 🔴
 ESPTab:CreateToggle({
