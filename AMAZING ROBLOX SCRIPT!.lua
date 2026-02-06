@@ -749,144 +749,147 @@ MiscTab:CreateToggle({
                 while getgenv().HitboxExpanderEnabled do
                     pcall(function()
                         local localPlayer = game.Players.LocalPlayer
-                        if not localPlayer.Character then return end
+                        if not localPlayer or not localPlayer.Character then return end
                         
+                        local char = localPlayer.Character
+                        if not char:FindFirstChild("HumanoidRootPart") then return end
+                        
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
                         local hitboxSize = getgenv().HitboxSize or 5
                         local transparency = getgenv().HitboxTransparency or 0.5
                         
+                        -- Process ALL other players
                         for _, player in ipairs(game.Players:GetPlayers()) do
-                            if player ~= localPlayer then -- CRITICAL: Only affect OTHER players
-                                local char = player.Character
-                                if char and char:FindFirstChild("HumanoidRootPart") then
-                                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                                    
-                                    -- Method 1: Directly scale the player's body parts
-                                    for _, part in ipairs(char:GetChildren()) do
-                                        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                                            -- Store original size if not already stored
-                                            if not part:GetAttribute("OriginalSize") then
-                                                part:SetAttribute("OriginalSize", part.Size)
-                                            end
-                                            
-                                            -- Scale the part based on hitbox size multiplier
-                                            local originalSize = part:GetAttribute("OriginalSize")
-                                            local scaleFactor = 1 + (hitboxSize / 10) -- Scale factor based on slider
-                                            part.Size = originalSize * scaleFactor
+                            if player == localPlayer then 
+                                -- CRITICAL: Skip local player completely
+                                continue 
+                            end
+                            
+                            local targetChar = player.Character
+                            if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then continue end
+                            
+                            local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+                            local humanoid = targetChar:FindFirstChild("Humanoid")
+                            if not humanoid then continue end
+                            
+                            -- METHOD 1: Create functional hitbox
+                            local hitbox = targetHrp:FindFirstChild("FunctionalHitbox")
+                            if not hitbox then
+                                hitbox = Instance.new("Part")
+                                hitbox.Name = "FunctionalHitbox"
+                                hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                                hitbox.Transparency = transparency
+                                hitbox.BrickColor = BrickColor.new("Really red")
+                                hitbox.Material = Enum.Material.ForceField
+                                hitbox.Anchored = false
+                                hitbox.CanCollide = false
+                                hitbox.Massless = true
+                                hitbox.Parent = targetHrp
+                                
+                                -- Store player reference
+                                hitbox:SetAttribute("TargetPlayer", player)
+                                hitbox:SetAttribute("IsHitbox", true)
+                                
+                                -- Create proper weld
+                                local weld = Instance.new("WeldConstraint")
+                                weld.Part0 = targetHrp
+                                weld.Part1 = hitbox
+                                weld.Parent = weld
+                            else
+                                -- Update existing hitbox
+                                hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                                hitbox.Transparency = transparency
+                            end
+                            
+                            -- METHOD 2: Scale body parts (safer method)
+                            if getgenv().HitboxSize and getgenv().HitboxSize > 5 then
+                                local scaleFactor = 1 + (getgenv().HitboxSize / 15) -- More conservative scaling
+                                
+                                for _, part in ipairs(targetChar:GetChildren()) do
+                                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                                        -- Store original size safely
+                                        if not part:GetAttribute("OriginalSize") then
+                                            part:SetAttribute("OriginalSize", part.Size)
                                         end
+                                        
+                                        -- Apply scaling
+                                        local originalSize = part:GetAttribute("OriginalSize")
+                                        part.Size = originalSize * scaleFactor
+                                    end
+                                end
+                            end
+                            
+                            -- METHOD 3: Damage hooking (most reliable)
+                            if humanoid and not humanoid:GetAttribute("HitboxHooked") then
+                                humanoid:SetAttribute("HitboxHooked", true)
+                                humanoid:SetAttribute("OriginalHealth", humanoid.Health)
+                                
+                                -- Create damage detection connection
+                                local connection
+                                connection = game:GetService("RunService").Heartbeat:Connect(function()
+                                    if not getgenv().HitboxExpanderEnabled or not humanoid or not humanoid.Parent then
+                                        if connection then connection:Disconnect() end
+                                        return
                                     end
                                     
-                                    -- Method 2: Create invisible hitbox parts that transfer damage
-                                    local hitbox = hrp:FindFirstChild("FunctionalHitbox")
-                                    if not hitbox then
-                                        hitbox = Instance.new("Part")
-                                        hitbox.Name = "FunctionalHitbox"
-                                        hitbox.Anchored = false
-                                        hitbox.CanCollide = false
-                                        hitbox.Massless = true
-                                        hitbox.Transparency = transparency
-                                        hitbox.BrickColor = BrickColor.new("Really red")
-                                        hitbox.Material = Enum.Material.ForceField
-                                        hitbox.Parent = hrp
+                                    -- Check local player's weapon proximity
+                                    local localChar = localPlayer.Character
+                                    if localChar and localChar:FindFirstChild("HumanoidRootPart") then
+                                        local localHrp = localChar:FindFirstChild("HumanoidRootPart")
+                                        local tool = localChar:FindFirstChildWhichIsA("Tool") or localPlayer.Backpack:FindFirstChildWhichIsA("Tool")
                                         
-                                        -- Use WeldConstraint for better syncing
-                                        local weld = Instance.new("WeldConstraint")
-                                        weld.Part0 = hrp
-                                        weld.Part1 = hitbox
-                                        weld.Parent = weld
-                                        
-                                        -- Store reference to real player
-                                        hitbox:SetAttribute("RealPlayer", player)
-                                        hitbox:SetAttribute("IsPlayerHitbox", true)
-                                    end
-                                    
-                                    -- Update hitbox size
-                                    hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                                    hitbox.Transparency = transparency
-                                    
-                                    -- Method 3: Hook into the game's damage system
-                                    local humanoid = char:FindFirstChild("Humanoid")
-                                    if humanoid and not humanoid:GetAttribute("HitboxHooked") then
-                                        humanoid:SetAttribute("HitboxHooked", true)
-                                        humanoid:SetAttribute("OriginalHealth", humanoid.Health)
-                                        
-                                        -- Create a connection to detect when player should take damage
-                                        local connection
-                                        connection = game:GetService("RunService").Heartbeat:Connect(function()
-                                            if not getgenv().HitboxExpanderEnabled or not humanoid or not humanoid.Parent then
-                                                if connection then
-                                                    connection:Disconnect()
-                                                end
-                                                return
-                                            end
-                                            
-                                            -- Check if local player's weapon is near the expanded hitbox
-                                            local localChar = localPlayer.Character
-                                            if localChar then
-                                                local tool = localChar:FindFirstChildWhichIsA("Tool") or localPlayer.Backpack:FindFirstChildWhichIsA("Tool")
-                                                if tool and (tool.Name == "Knife" or tool.Name == "Gun") then
-                                                    local toolHandle = tool:FindFirstChild("Handle")
-                                                    if toolHandle then
-                                                        local distance = (toolHandle.Position - hrp.Position).Magnitude
-                                                        if distance <= hitboxSize then
-                                                            -- Simulate a direct hit on the player
-                                                            local originalDistance = (toolHandle.Position - hrp.Position).Magnitude
-                                                            if originalDistance <= 2 then -- Normal hit range
-                                                                -- This is a normal hit, let game handle it
-                                                                return
-                                                            else
-                                                                -- This is an expanded hitbox hit, force damage
-                                                                if tool.Name == "Knife" and player ~= localPlayer then -- EXTRA PROTECTION
-                                                                    -- Knife hit - apply damage directly
-                                                                    humanoid:TakeDamage(40) -- Typical knife damage
-                                                                elseif tool.Name == "Gun" and player ~= localPlayer then -- EXTRA PROTECTION
-                                                                    -- Gun hit - apply damage directly
-                                                                    humanoid:TakeDamage(20) -- Typical gun damage
-                                                                end
-                                                            end
+                                        if tool and (tool.Name == "Knife" or tool.Name == "Gun") then
+                                            local toolHandle = tool:FindFirstChild("Handle")
+                                            if toolHandle then
+                                                local distance = (toolHandle.Position - targetHrp.Position).Magnitude
+                                                
+                                                -- Check if within expanded hitbox range
+                                                if distance <= hitboxSize then
+                                                    -- Determine if this is a normal hit or expanded hitbox hit
+                                                    local normalRange = 2 -- Normal attack range
+                                                    
+                                                    if distance > normalRange then
+                                                        -- This is an expanded hitbox hit - apply damage directly
+                                                        if tool.Name == "Knife" then
+                                                            humanoid:TakeDamage(40) -- Knife damage
+                                                        elseif tool.Name == "Gun" then
+                                                            humanoid:TakeDamage(20) -- Gun damage
+                                                        end
+                                                        
+                                                        -- Visual feedback
+                                                        local effect = targetHrp:FindFirstChild("HitboxEffect")
+                                                        if not effect then
+                                                            effect = Instance.new("Part")
+                                                            effect.Name = "HitboxEffect"
+                                                            effect.Size = Vector3.new(2, 2, 2)
+                                                            effect.Position = targetHrp.Position
+                                                            effect.BrickColor = BrickColor.new("Bright orange")
+                                                            effect.Material = Enum.Material.Neon
+                                                            effect.Anchored = true
+                                                            effect.CanCollide = false
+                                                            effect.Parent = workspace
+                                                            
+                                                            game:GetService("Debris"):AddItem(effect, 0.5)
                                                         end
                                                     end
                                                 end
                                             end
-                                        end)
+                                        end
                                     end
-                                end
-                            end
-                        end
-                        
-                        -- CRITICAL: Ensure local player is never affected
-                        local localChar = localPlayer.Character
-                        if localChar then
-                            -- Remove any hitbox expanders from local player
-                            local localHrp = localChar:FindFirstChild("HumanoidRootPart")
-                            if localHrp then
-                                local hitbox = localHrp:FindFirstChild("FunctionalHitbox")
-                                if hitbox then
-                                    hitbox:Destroy()
-                                end
-                            end
-                            
-                            -- Restore local player's body part sizes
-                            for _, part in ipairs(localChar:GetChildren()) do
-                                if part:IsA("BasePart") and part:GetAttribute("OriginalSize") then
-                                    part.Size = part:GetAttribute("OriginalSize")
-                                    part:SetAttribute("OriginalSize", nil)
-                                end
-                            end
-                            
-                            -- Remove hitbox hook from local player's humanoid
-                            local localHumanoid = localChar:FindFirstChild("Humanoid")
-                            if localHumanoid then
-                                localHumanoid:SetAttribute("HitboxHooked", nil)
-                                localHumanoid:SetAttribute("OriginalHealth", nil)
+                                end)
                             end
                         end
                     end)
-                    task.wait(0.1)
+                    task.wait(0.1) -- Fast updates for smooth operation
                 end
             end)()
         else
-            -- Clean up hitbox expanders and restore original sizes when disabled
+            -- Clean up everything when disabled
             pcall(function()
+                local localPlayer = game.Players.LocalPlayer
+                if not localPlayer then return end
+                
+                -- Remove all hitboxes from all players
                 for _, player in ipairs(game.Players:GetPlayers()) do
                     local char = player.Character
                     if char and char:FindFirstChild("HumanoidRootPart") then
@@ -906,11 +909,17 @@ MiscTab:CreateToggle({
                             end
                         end
                         
-                        -- Remove hitbox hook from humanoid
+                        -- Remove hitbox hook
                         local humanoid = char:FindFirstChild("Humanoid")
                         if humanoid then
                             humanoid:SetAttribute("HitboxHooked", nil)
                             humanoid:SetAttribute("OriginalHealth", nil)
+                        end
+                        
+                        -- Remove hit effects
+                        local effect = hrp:FindFirstChild("HitboxEffect")
+                        if effect then
+                            effect:Destroy()
                         end
                     end
                 end
@@ -959,139 +968,100 @@ MiscTab:CreateToggle({
                         local originalPosition = hrp.Position
                         local coinsCollected = 0
                         
-                        -- Find all coins with better detection
-                        for _, obj in ipairs(workspace:GetDescendants()) do
-                            -- CRITICAL: Check if still enabled before each coin
-                            if not getgenv().CoinAutoFarmEnabled then 
-                                -- Return to original position immediately
-                                hrp.Position = originalPosition
-                                break 
-                            end
+                        -- Simple and effective coin detection
+                        for _, obj in ipairs(workspace:GetChildren()) do
+                            if not getgenv().CoinAutoFarmEnabled then break end
                             
+                            -- Check if it's a coin (simplified detection)
                             local isCoin = false
                             
-                            -- Enhanced coin detection
-                            if obj:IsA("Part") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
-                                -- Check by name (case insensitive)
-                                local name = obj.Name:lower()
-                                if name:find("coin") or name:find("money") or name:find("cash") or name:find("shard") or name:find("gem") then
-                                    isCoin = true
-                                end
+                            -- Method 1: Check by name
+                            local name = obj.Name:lower()
+                            if name:find("coin") or name:find("money") or name:find("cash") or name:find("shard") or name:find("gem") then
+                                isCoin = true
+                            end
+                            
+                            -- Method 2: Check by appearance
+                            if not isCoin and obj:IsA("Part") then
+                                local coinColors = {
+                                    BrickColor.new("Bright yellow"),
+                                    BrickColor.new("Yellow"),
+                                    BrickColor.new("Gold"),
+                                    BrickColor.new("New Yeller")
+                                }
                                 
-                                -- Check by appearance (MM2 coins are typically small and yellow/gold)
-                                if not isCoin then
-                                    local coinColors = {
-                                        BrickColor.new("Bright yellow"),
-                                        BrickColor.new("Yellow"),
-                                        BrickColor.new("New Yeller"),
-                                        BrickColor.new("Gold"),
-                                        BrickColor.new("Bright orange"),
-                                        BrickColor.new("Pastel yellow")
-                                    }
-                                    
-                                    for _, color in ipairs(coinColors) do
-                                        if obj.BrickColor == color and obj.Size.X <= 5 and obj.Size.Y <= 5 and obj.Size.Z <= 5 then
-                                            isCoin = true
-                                            break
-                                        end
-                                    end
-                                end
-                                
-                                -- Check if it has collection properties
-                                if not isCoin then
-                                    if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") or obj:FindFirstChild("ProximityPrompt") then
-                                        if obj.Size.X <= 4 and obj.Size.Y <= 4 and obj.Size.Z <= 4 then
-                                            isCoin = true
-                                        end
+                                for _, color in ipairs(coinColors) do
+                                    if obj.BrickColor == color and obj.Size.X <= 4 and obj.Size.Y <= 4 and obj.Size.Z <= 4 then
+                                        isCoin = true
+                                        break
                                     end
                                 end
                             end
                             
-                            if isCoin and obj.Parent then
-                                -- CRITICAL: Check if still enabled before processing this coin
-                                if not getgenv().CoinAutoFarmEnabled then 
-                                    hrp.Position = originalPosition
-                                    break 
+                            -- Method 3: Check by collection properties
+                            if not isCoin and obj:IsA("Part") then
+                                if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") then
+                                    if obj.Size.X <= 3 and obj.Size.Y <= 3 and obj.Size.Z <= 3 then
+                                        isCoin = true
+                                    end
                                 end
-                                
+                            end
+                            
+                            -- Collect the coin if detected
+                            if isCoin and obj.Parent then
                                 local distance = (obj.Position - hrp.Position).Magnitude
-                                if distance <= 1000 then -- Large range for collection
+                                if distance <= 500 then -- Collection range
                                     
-                                    -- METHOD 1: Direct teleport and touch
+                                    -- TELEPORT TO COIN
                                     hrp.Position = obj.Position
-                                    task.wait(0.05)
+                                    task.wait(0.1)
                                     
-                                    -- CRITICAL: Check if still enabled during multi-angle touching
-                                    local positions = {
-                                        obj.Position,
-                                        obj.Position + Vector3.new(0.5, 0, 0),
-                                        obj.Position - Vector3.new(0.5, 0, 0),
-                                        obj.Position + Vector3.new(0, 0.5, 0),
-                                        obj.Position - Vector3.new(0, 0.5, 0),
-                                        obj.Position + Vector3.new(0, 0, 0.5),
-                                        obj.Position - Vector3.new(0, 0, 0.5)
-                                    }
+                                    -- COLLECTION METHOD 1: Touch the coin
+                                    obj.CanCollide = false
+                                    obj.Position = hrp.Position
+                                    task.wait(0.1)
                                     
-                                    for _, pos in ipairs(positions) do
-                                        if not getgenv().CoinAutoFarmEnabled then 
-                                            hrp.Position = originalPosition
-                                            break 
-                                        end
-                                        if not obj.Parent then break end -- Coin collected
-                                        hrp.Position = pos
-                                        task.wait(0.02)
-                                    end
-                                    
-                                    -- CRITICAL: Check if still enabled before event firing
-                                    if not getgenv().CoinAutoFarmEnabled then 
-                                        hrp.Position = originalPosition
-                                        break 
-                                    end
-                                    
-                                    -- METHOD 2: Fire touch events
-                                    if obj.Parent and obj:FindFirstChild("TouchTransmitter") then
+                                    -- COLLECTION METHOD 2: Fire touch events
+                                    if obj:FindFirstChild("TouchTransmitter") then
                                         local touch = obj:FindFirstChild("TouchTransmitter")
-                                        if touch and #touch:GetConnectedChildren() > 0 then
-                                            for _, connection in pairs(touch:GetConnectedChildren()) do
-                                                if connection:IsA("RemoteEvent") then
-                                                    connection:FireServer()
-                                                end
+                                        for _, connection in pairs(touch:GetConnectedChildren()) do
+                                            if connection:IsA("RemoteEvent") then
+                                                connection:FireServer()
                                             end
                                         end
                                     end
                                     
-                                    -- METHOD 3: Click detector
-                                    if obj.Parent and obj:FindFirstChild("ClickDetector") then
+                                    -- COLLECTION METHOD 3: Click detector
+                                    if obj:FindFirstChild("ClickDetector") then
                                         local click = obj:FindFirstChild("ClickDetector")
                                         click.MaxActivationDistance = 1000
                                         fireclickdetector(click)
                                     end
                                     
-                                    -- METHOD 4: Proximity prompt
-                                    if obj.Parent and obj:FindFirstChild("ProximityPrompt") then
+                                    -- COLLECTION METHOD 4: Proximity prompt
+                                    if obj:FindFirstChild("ProximityPrompt") then
                                         local prompt = obj:FindFirstChild("ProximityPrompt")
                                         prompt.MaxActivationDistance = 1000
                                         prompt:InputHoldEnded()
                                     end
                                     
-                                    -- METHOD 5: Force collection by changing properties
+                                    -- COLLECTION METHOD 5: Force collection
                                     if obj.Parent then
-                                        obj.CanCollide = false
                                         obj.Anchored = false
                                         obj.Position = hrp.Position
-                                        task.wait(0.05)
+                                        task.wait(0.1)
                                     end
                                     
                                     -- Check if coin was collected
                                     if not obj.Parent then
                                         coinsCollected = coinsCollected + 1
                                     else
-                                        -- Last resort - try to remove it manually
+                                        -- Force collect if still there
                                         obj:Destroy()
                                         coinsCollected = coinsCollected + 1
                                     end
                                     
-                                    task.wait(0.1)
+                                    task.wait(0.2) -- Small delay between coins
                                 end
                             end
                         end
@@ -1108,7 +1078,7 @@ MiscTab:CreateToggle({
                             })
                         end
                         
-                        task.wait(2) -- Wait before next cycle
+                        task.wait(3) -- Wait before next cycle
                     end)
                     task.wait(1) -- Check every second
                 end
@@ -1120,9 +1090,7 @@ MiscTab:CreateToggle({
                 local char = localPlayer.Character
                 if char and char:FindFirstChild("HumanoidRootPart") then
                     local hrp = char:FindFirstChild("HumanoidRootPart")
-                    -- Return to a safe position (ground level)
-                    hrp.Position = Vector3.new(hrp.Position.X, 100, hrp.Position.Z)
-                    task.wait(0.1)
+                    -- Return to a safe position
                     hrp.Position = Vector3.new(hrp.Position.X, workspace.CurrentCamera.Focus.Position.Y, hrp.Position.Z)
                 end
             end)
