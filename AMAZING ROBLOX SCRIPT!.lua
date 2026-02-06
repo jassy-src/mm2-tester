@@ -86,6 +86,15 @@ ESPTab:CreateToggle({
     end,
 })
 
+-- Gun ESP Toggle 🔫
+ESPTab:CreateToggle({
+    Name = "🔫 Gun ESP",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().GunESPEnabled = value
+    end,
+})
+
 -- ESP Folder for Highlights
 local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "MM2_RoleESP_Highlights"
@@ -95,6 +104,11 @@ ESPFolder.Parent = game.CoreGui
 local NameESPFolder = Instance.new("Folder")
 NameESPFolder.Name = "MM2_NameESP"
 NameESPFolder.Parent = game.CoreGui
+
+-- Gun ESP Folder
+local GunESPFolder = Instance.new("Folder")
+GunESPFolder.Name = "MM2_GunESP"
+GunESPFolder.Parent = game.CoreGui
 
 -- Track Player Function
 local function TrackPlayer(player)
@@ -202,6 +216,85 @@ game.Players.PlayerRemoving:Connect(function(player)
     local oldBillboard = NameESPFolder:FindFirstChild(player.Name .. "_NameESP")
     if oldBillboard then
         oldBillboard:Destroy()
+    end
+end)
+
+-- Gun ESP Function
+local function TrackGun(gun)
+    -- Gun ESP Billboard
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = gun.Name .. "_GunESP"
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = GunESPFolder
+
+    local gunLabel = Instance.new("TextLabel")
+    gunLabel.Size = UDim2.new(1, 0, 1, 0)
+    gunLabel.BackgroundTransparency = 1
+    gunLabel.Text = "🔫 GUN"
+    gunLabel.TextColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    gunLabel.TextStrokeTransparency = 0
+    gunLabel.TextScaled = true
+    gunLabel.Font = Enum.Font.SourceSansBold
+    gunLabel.Parent = billboard
+
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Text = ""
+    distanceLabel.TextColor3 = Color3.fromRGB(255, 165, 0) -- Orange
+    distanceLabel.TextStrokeTransparency = 0
+    distanceLabel.TextScaled = true
+    distanceLabel.Font = Enum.Font.SourceSans
+    distanceLabel.Parent = billboard
+
+    coroutine.wrap(function()
+        while gun and gun.Parent do
+            pcall(function()
+                if gun:FindFirstChild("Handle") then
+                    billboard.Adornee = gun.Handle
+                    
+                    -- Calculate distance
+                    local localChar = game.Players.LocalPlayer.Character
+                    if localChar and localChar:FindFirstChild("HumanoidRootPart") then
+                        local distance = (gun.Handle.Position - localChar:FindFirstChild("HumanoidRootPart").Position).Magnitude
+                        distanceLabel.Text = string.format("%.1f studs", distance)
+                    end
+                    
+                    billboard.Enabled = getgenv().GunESPEnabled
+                else
+                    billboard.Enabled = false
+                end
+            end)
+            task.wait(0.1)
+        end
+        billboard:Destroy()
+    end)()
+end
+
+-- Track existing guns in workspace
+for _, obj in ipairs(workspace:GetDescendants()) do
+    if obj:IsA("Tool") and obj.Name == "Gun" and obj.Parent == workspace then
+        TrackGun(obj)
+    end
+end
+
+-- Watch for new guns being added to workspace
+workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("Tool") and obj.Name == "Gun" and obj.Parent == workspace then
+        TrackGun(obj)
+    end
+end)
+
+-- Clean up gun ESP when guns are removed
+workspace.DescendantRemoving:Connect(function(obj)
+    if obj:IsA("Tool") and obj.Name == "Gun" then
+        local oldBillboard = GunESPFolder:FindFirstChild(obj.Name .. "_GunESP")
+        if oldBillboard then
+            oldBillboard:Destroy()
+        end
     end
 end)
 
@@ -428,37 +521,101 @@ MiscTab:CreateToggle({
     end,
 })
 
--- Speed Boost
-MiscTab:CreateSlider({
+-- Speed Boost Toggle
+MiscTab:CreateToggle({
     Name = "[Speed Boost]",
-    Range = {16, 200},
-    Increment = 4,
-    CurrentValue = 16,
+    CurrentValue = false,
     Callback = function(value)
-        getgenv().WalkSpeed = value
-        pcall(function()
-            local char = game.Players.LocalPlayer.Character
-            if char and char:FindFirstChildOfClass("Humanoid") then
-                char:FindFirstChildOfClass("Humanoid").WalkSpeed = value
-            end
-        end)
+        getgenv().SpeedBoostEnabled = value
+        if value then
+            getgenv().SpeedBoostValue = 50 -- Default speed value
+            coroutine.wrap(function()
+                while getgenv().SpeedBoostEnabled do
+                    pcall(function()
+                        local char = game.Players.LocalPlayer.Character
+                        if char and char:FindFirstChildOfClass("Humanoid") then
+                            char:FindFirstChildOfClass("Humanoid").WalkSpeed = getgenv().SpeedBoostValue or 50
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        else
+            pcall(function()
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChildOfClass("Humanoid") then
+                    char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16 -- Reset to default
+                end
+            end)
+        end
     end,
 })
 
--- Jump Power
+-- Speed Boost Value Slider
 MiscTab:CreateSlider({
-    Name = "[Jump Power]",
-    Range = {50, 200},
-    Increment = 10,
+    Name = "[Speed Value]",
+    Range = {16, 200},
+    Increment = 4,
     CurrentValue = 50,
     Callback = function(value)
-        getgenv().JumpPower = value
-        pcall(function()
-            local char = game.Players.LocalPlayer.Character
-            if char and char:FindFirstChildOfClass("Humanoid") then
-                char:FindFirstChildOfClass("Humanoid").JumpPower = value
-            end
-        end)
+        getgenv().SpeedBoostValue = value
+        if getgenv().SpeedBoostEnabled then
+            pcall(function()
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChildOfClass("Humanoid") then
+                    char:FindFirstChildOfClass("Humanoid").WalkSpeed = value
+                end
+            end)
+        end
+    end,
+})
+
+-- Jump Power Toggle
+MiscTab:CreateToggle({
+    Name = "[Jump Power]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().JumpPowerEnabled = value
+        if value then
+            getgenv().JumpPowerValue = 100 -- Default jump value
+            coroutine.wrap(function()
+                while getgenv().JumpPowerEnabled do
+                    pcall(function()
+                        local char = game.Players.LocalPlayer.Character
+                        if char and char:FindFirstChildOfClass("Humanoid") then
+                            char:FindFirstChildOfClass("Humanoid").JumpPower = getgenv().JumpPowerValue or 100
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        else
+            pcall(function()
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChildOfClass("Humanoid") then
+                    char:FindFirstChildOfClass("Humanoid").JumpPower = 50 -- Reset to default
+                end
+            end)
+        end
+    end,
+})
+
+-- Jump Power Value Slider
+MiscTab:CreateSlider({
+    Name = "[Jump Value]",
+    Range = {50, 200},
+    Increment = 10,
+    CurrentValue = 100,
+    Callback = function(value)
+        getgenv().JumpPowerValue = value
+        if getgenv().JumpPowerEnabled then
+            pcall(function()
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChildOfClass("Humanoid") then
+                    char:FindFirstChildOfClass("Humanoid").JumpPower = value
+                end
+            end)
+        end
     end,
 })
 
@@ -468,6 +625,22 @@ MiscTab:CreateToggle({
     CurrentValue = false,
     Callback = function(value)
         getgenv().InfiniteJump = value
+        if value then
+            getgenv().InfiniteJumpConnection = game:GetService("UserInputService").JumpRequest:Connect(function()
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChildOfClass("Humanoid") then
+                    local humanoid = char:FindFirstChildOfClass("Humanoid")
+                    if humanoid:GetState() ~= Enum.HumanoidStateType.Freefall then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+        else
+            if getgenv().InfiniteJumpConnection then
+                getgenv().InfiniteJumpConnection:Disconnect()
+                getgenv().InfiniteJumpConnection = nil
+            end
+        end
     end,
 })
 
@@ -579,7 +752,6 @@ MiscTab:CreateToggle({
     end,
 })
 
-
 -- Anti Knockback
 MiscTab:CreateToggle({
     Name = "[Anti Knockback]",
@@ -598,6 +770,123 @@ MiscTab:CreateToggle({
                     task.wait(0.1)
                 end
             end)()
+        end
+    end,
+})
+
+-- Auto Grab Gun
+MiscTab:CreateToggle({
+    Name = "[Auto Grab Gun]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AutoGrabGunEnabled = value
+        if value then
+            getgenv().OriginalPosition = nil
+            getgenv().SheriffDead = false
+            
+            coroutine.wrap(function()
+                while getgenv().AutoGrabGunEnabled do
+                    pcall(function()
+                        local localChar = game.Players.LocalPlayer.Character
+                        if not localChar or not localChar:FindFirstChild("HumanoidRootPart") then
+                            task.wait(1)
+                            return
+                        end
+                        
+                        -- Store original position if not already stored
+                        if not getgenv().OriginalPosition then
+                            getgenv().OriginalPosition = localChar:FindFirstChild("HumanoidRootPart").Position
+                        end
+                        
+                        -- Check if sheriff is dead and gun is dropped
+                        local gunFound = false
+                        local gunPosition = nil
+                        
+                        -- Search for dropped gun in workspace
+                        for _, obj in ipairs(workspace:GetDescendants()) do
+                            if obj:IsA("Tool") and obj.Name == "Gun" and obj.Parent == workspace then
+                                gunFound = true
+                                gunPosition = obj.Handle.Position
+                                break
+                            end
+                        end
+                        
+                        -- Also check if sheriff player is dead
+                        local sheriffDead = false
+                        for _, player in ipairs(game.Players:GetPlayers()) do
+                            if player ~= game.Players.LocalPlayer then
+                                local char = player.Character
+                                if char then
+                                    local humanoid = char:FindFirstChildOfClass("Humanoid")
+                                    local gun = char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))
+                                    
+                                    if gun and humanoid and humanoid.Health <= 0 then
+                                        sheriffDead = true
+                                        break
+                                    elseif gun and not char:FindFirstChild("HumanoidRootPart") then
+                                        sheriffDead = true
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        
+                        -- If gun is found and sheriff is dead, grab it
+                        if gunFound and gunPosition and (sheriffDead or getgenv().SheriffDead) then
+                            getgenv().SheriffDead = true
+                            
+                            -- Teleport to gun position
+                            local hrp = localChar:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                hrp.CFrame = CFrame.new(gunPosition + Vector3.new(0, 5, 0))
+                                task.wait(0.2)
+                                
+                                -- Try to pick up the gun by moving close to it
+                                for _, obj in ipairs(workspace:GetDescendants()) do
+                                    if obj:IsA("Tool") and obj.Name == "Gun" and obj.Parent == workspace then
+                                        local distance = (obj.Handle.Position - hrp.Position).Magnitude
+                                        if distance < 10 then
+                                            -- Try to equip the gun
+                                            obj.Parent = game.Players.LocalPlayer.Backpack
+                                            task.wait(0.1)
+                                            obj.Parent = localChar
+                                            task.wait(0.3)
+                                            break
+                                        end
+                                    end
+                                end
+                                
+                                -- Teleport back to original position
+                                if getgenv().OriginalPosition then
+                                    hrp.CFrame = CFrame.new(getgenv().OriginalPosition)
+                                    task.wait(0.5)
+                                end
+                                
+                                -- Notify success
+                                Rayfield:Notify({
+                                    Title = "Auto Grab Gun",
+                                    Content = "Successfully grabbed the gun!",
+                                    Duration = 3
+                                })
+                                
+                                -- Reset for next round
+                                getgenv().SheriffDead = false
+                                getgenv().OriginalPosition = nil
+                            end
+                        end
+                        
+                        -- Reset if new round starts (no gun found and sheriff not dead)
+                        if not gunFound and not sheriffDead then
+                            getgenv().SheriffDead = false
+                        end
+                    end)
+                    task.wait(0.5)
+                end
+            end)()
+        else
+            -- Reset when disabled
+            getgenv().SheriffDead = false
+            getgenv().OriginalPosition = nil
         end
     end,
 })
@@ -641,6 +930,7 @@ CreditsDiscordTab:CreateButton({
         getgenv().RoleESPEnabled = false
         getgenv().NameESPEnabled = false
         getgenv().DistanceESPEnabled = false
+        getgenv().GunESPEnabled = false
         getgenv().AimbotEnabled = false
         getgenv().NoClipEnabled = false
         getgenv().FlyEnabled = false
@@ -649,6 +939,26 @@ CreditsDiscordTab:CreateButton({
         getgenv().InvisibleEnabled = false
         getgenv().AntiKnockbackEnabled = false
         getgenv().AntiCheatBypass = false
+        getgenv().AutoGrabGunEnabled = false
+        getgenv().SpeedBoostEnabled = false
+        getgenv().JumpPowerEnabled = false
+        getgenv().InfiniteJump = false
+        
+        -- Reset speed and jump to defaults
+        pcall(function()
+            local char = game.Players.LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                humanoid.WalkSpeed = 16
+                humanoid.JumpPower = 50
+            end
+        end)
+        
+        -- Disconnect infinite jump
+        if getgenv().InfiniteJumpConnection then
+            getgenv().InfiniteJumpConnection:Disconnect()
+            getgenv().InfiniteJumpConnection = nil
+        end
         
         -- Clean up ESP
         pcall(function()
@@ -657,6 +967,9 @@ CreditsDiscordTab:CreateButton({
             end
             if workspace:FindFirstChild("MM2_NameESP") then
                 workspace:FindFirstChild("MM2_NameESP"):Destroy()
+            end
+            if workspace:FindFirstChild("MM2_GunESP") then
+                workspace:FindFirstChild("MM2_GunESP"):Destroy()
             end
         end)
         
