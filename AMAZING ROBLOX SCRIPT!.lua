@@ -265,91 +265,132 @@ AimbotTab:CreateToggle({
                         if not char then return end
                         
                         local tool = char:FindFirstChildWhichIsA("Tool")
-                        if tool and tool.Name == "Gun" then
-                            -- Find the closest target
-                            local target = getClosestPlayer()
-                            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                                local targetPos = target.Character:FindFirstChild("HumanoidRootPart").Position
-                                
-                                -- Hook into the gun's firing mechanism
-                                local gunScript = tool:FindFirstChildWhichIsA("Script") or tool:FindFirstChildWhichIsA("LocalScript")
-                                if gunScript and not gunScript:GetAttribute("MagicBulletHooked") then
-                                    gunScript:SetAttribute("MagicBulletHooked", true)
+                        if not tool or tool.Name ~= "Gun" then return end
+                        
+                        local toolHandle = tool:FindFirstChild("Handle")
+                        if not toolHandle then return end
+                        
+                        -- Find target
+                        local target = getClosestPlayer()
+                        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+                        
+                        local targetPos = target.Character:FindFirstChild("HumanoidRootPart").Position + Vector3.new(0, 1, 0) -- Aim at chest/head level
+                        
+                        -- Hook into the gun's firing mechanism
+                        local gunScript = tool:FindFirstChildWhichIsA("Script") or tool:FindFirstChildWhichIsA("LocalScript")
+                        if gunScript and not gunScript:GetAttribute("MagicBulletHooked") then
+                            gunScript:SetAttribute("MagicBulletHooked", true)
+                            
+                            -- Override the gun's firing function
+                            local originalFire = nil
+                            
+                            -- Find the fire function
+                            for _, child in ipairs(tool:GetChildren()) do
+                                if child:IsA("Script") or child:IsA("LocalScript") then
+                                    local success, result = pcall(function()
+                                        return loadstring([[
+                                            local tool = script.Parent.Parent
+                                            local player = game.Players.LocalPlayer
+                                            local char = player.Character
+                                            
+                                            -- MAGIC BULLET FUNCTION
+                                            return function(targetPos, intensity)
+                                                local bullets = {}
+                                                
+                                                -- Create a custom bullet that will curve
+                                                local magicBullet = Instance.new("Part")
+                                                magicBullet.Name = "MagicBullet_" .. tick()
+                                                magicBullet.Size = Vector3.new(0.5, 0.5, 2)
+                                                magicBullet.BrickColor = BrickColor.new("Really red")
+                                                magicBullet.Material = Enum.Material.Neon
+                                                magicBullet.Anchored = false
+                                                magicBullet.CanCollide = false
+                                                magicBullet.Parent = workspace
+                                                
+                                                -- Add velocity towards target
+                                                local direction = (targetPos - toolHandle.Position).Unit
+                                                magicBullet.Velocity = direction * 500 -- Fast bullet speed
+                                                
+                                                -- Curve calculation
+                                                local curveIntensity = intensity or getgenv().MagicBulletIntensity or 5
+                                                local curvePoint = toolHandle.Position + Vector3.new(0, curveIntensity, 0)
+                                                
+                                                -- Animate the bullet along curved path
+                                                local startTime = tick()
+                                                local duration = 0.3 -- Time to reach target
+                                                
+                                                local connection
+                                                connection = game:GetService("RunService").Heartbeat:Connect(function()
+                                                    local elapsed = tick() - startTime
+                                                    local progress = math.min(elapsed / duration, 1)
+                                                    
+                                                    -- Quadratic Bezier curve
+                                                    local t = progress
+                                                    local curvePos = (1-t)^2 * toolHandle.Position + 2*(1-t)*t * curvePoint + t^2 * targetPos
+                                                    
+                                                    magicBullet.Position = curvePos
+                                                    magicBullet.CFrame = CFrame.lookAt(curvePos, targetPos)
+                                                    
+                                                    -- Check if bullet reached target
+                                                    if progress >= 1 then
+                                                        -- Apply damage to target
+                                                        local targetChar = target.Character
+                                                        if targetChar then
+                                                            local humanoid = targetChar:FindFirstChild("Humanoid")
+                                                            if humanoid then
+                                                                humanoid:TakeDamage(20) -- Gun damage
+                                                                
+                                                                -- Visual effect
+                                                                local hitEffect = Instance.new("Part")
+                                                                hitEffect.Size = Vector3.new(3, 3, 3)
+                                                                hitEffect.Position = targetPos
+                                                                hitEffect.BrickColor = BrickColor.new("Bright orange")
+                                                                hitEffect.Material = Enum.Material.Neon
+                                                                hitEffect.Anchored = true
+                                                                hitEffect.CanCollide = false
+                                                                hitEffect.Parent = workspace
+                                                                
+                                                                game:GetService("Debris"):AddItem(hitEffect, 0.5)
+                                                            end
+                                                        end
+                                                        
+                                                        -- Clean up
+                                                        magicBullet:Destroy()
+                                                        if connection then
+                                                            connection:Disconnect()
+                                                        end
+                                                    end
+                                                end)
+                                                
+                                                table.insert(bullets, magicBullet)
+                                            end
+                                        ]])
+                                    end)
                                     
-                                    -- Create a bullet manipulation system
-                                    game:GetService("RunService").Heartbeat:Connect(function()
-                                        if not getgenv().MagicBulletEnabled then return end
-                                        
-                                        -- Look for newly created bullets
-                                        for _, obj in ipairs(workspace:GetDescendants()) do
-                                            if obj:IsA("Part") and obj.Name:find("Bullet") or obj.Name:find("Projectile") then
-                                                if not obj:GetAttribute("MagicBulletProcessed") then
-                                                    obj:SetAttribute("MagicBulletProcessed", true)
-                                                    
-                                                    -- Calculate trajectory to target
-                                                    local startPos = obj.Position
-                                                    local endPos = targetPos + Vector3.new(0, 1, 0) -- Aim at head/chest level
-                                                    
-                                                    -- Create a curved path
-                                                    local curveIntensity = getgenv().MagicBulletIntensity or 5
-                                                    local midPoint = (startPos + endPos) / 2 + Vector3.new(0, curveIntensity, 0)
-                                                    
-                                                    -- Animate the bullet along the curved path
-                                                    local startTime = tick()
-                                                    local duration = 0.2 -- Time to reach target
-                                                    
-                                                    local connection
-                                                    connection = game:GetService("RunService").Heartbeat:Connect(function()
-                                                        local elapsed = tick() - startTime
-                                                        local progress = math.min(elapsed / duration, 1)
-                                                        
-                                                        -- Quadratic Bezier curve for smooth curving
-                                                        local t = progress
-                                                        local curvePos = (1-t)^2 * startPos + 2*(1-t)*t * midPoint + t^2 * endPos
-                                                        
-                                                        obj.Position = curvePos
-                                                        
-                                                        -- Make the bullet look at the target
-                                                        if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                                                            obj.CFrame = CFrame.lookAt(curvePos, target.Character:FindFirstChild("HumanoidRootPart").Position)
-                                                        end
-                                                        
-                                                        -- When bullet reaches target, ensure hit registration
-                                                        if progress >= 1 then
-                                                            -- Force hit registration
-                                                            local targetChar = target.Character
-                                                            if targetChar then
-                                                                local humanoid = targetChar:FindFirstChild("Humanoid")
-                                                                if humanoid then
-                                                                    -- Apply damage directly
-                                                                    humanoid:TakeDamage(20)
-                                                                    
-                                                                    -- Create visual effect
-                                                                    local hitEffect = Instance.new("Part")
-                                                                    hitEffect.Size = Vector3.new(1, 1, 1)
-                                                                    hitEffect.Position = endPos
-                                                                    hitEffect.BrickColor = BrickColor.new("Really red")
-                                                                    hitEffect.Material = Enum.Material.Neon
-                                                                    hitEffect.Anchored = true
-                                                                    hitEffect.CanCollide = false
-                                                                    hitEffect.Parent = workspace
-                                                                    
-                                                                    -- Remove effect after short time
-                                                                    game:GetService("Debris"):AddItem(hitEffect, 0.5)
-                                                                end
-                                                            end
-                                                            
-                                                            -- Remove the bullet
-                                                            obj:Destroy()
-                                                            if connection then
-                                                                connection:Disconnect()
-                                                            end
-                                                        end
-                                                    end)
-                                                end
+                                    if success and result then
+                                        originalFire = result
+                                        break
+                                    end
+                                end
+                            end
+                            
+                            -- If we found the fire function, override it
+                            if originalFire then
+                                -- Create a wrapper that calls magic bullet function
+                                local newFire = function(...)
+                                    -- Call magic bullet function instead
+                                    return originalFire(targetPos, getgenv().MagicBulletIntensity or 5)
+                                end
+                                
+                                -- Replace the original fire function
+                                for _, child in ipairs(tool:GetChildren()) do
+                                    if child:IsA("Script") or child:IsA("LocalScript") then
+                                        for _, prop in ipairs(child:GetChildren()) do
+                                            if prop:IsA("BindableFunction") and prop.Name == "Fire" then
+                                                prop.Value = newFire
                                             end
                                         end
-                                    end)
+                                    end
                                 end
                             end
                         end
@@ -357,6 +398,15 @@ AimbotTab:CreateToggle({
                     task.wait(0.1)
                 end
             end)()
+        else
+            -- Clean up magic bullets when disabled
+            pcall(function()
+                for _, obj in ipairs(workspace:GetChildren()) do
+                    if obj.Name:find("MagicBullet_") then
+                        obj:Destroy()
+                    end
+                end
+            end)
         end
     end,
 })
@@ -856,21 +906,21 @@ MiscTab:CreateToggle({
                                                             humanoid:TakeDamage(20) -- Gun damage
                                                         end
                                                         
-                                                        -- Visual feedback
-                                                        local effect = targetHrp:FindFirstChild("HitboxEffect")
-                                                        if not effect then
-                                                            effect = Instance.new("Part")
-                                                            effect.Name = "HitboxEffect"
-                                                            effect.Size = Vector3.new(2, 2, 2)
-                                                            effect.Position = targetHrp.Position
-                                                            effect.BrickColor = BrickColor.new("Bright orange")
-                                                            effect.Material = Enum.Material.Neon
-                                                            effect.Anchored = true
-                                                            effect.CanCollide = false
-                                                            effect.Parent = workspace
-                                                            
-                                                            game:GetService("Debris"):AddItem(effect, 0.5)
-                                                        end
+                                                        -- Visual feedback (REMOVED - too obvious)
+                                                        -- local effect = targetHrp:FindFirstChild("HitboxEffect")
+                                                        -- if not effect then
+                                                        --     effect = Instance.new("Part")
+                                                        --     effect.Name = "HitboxEffect"
+                                                        --     effect.Size = Vector3.new(2, 2, 2)
+                                                        --     effect.Position = targetHrp.Position
+                                                        --     effect.BrickColor = BrickColor.new("Bright orange")
+                                                        --     effect.Material = Enum.Material.Neon
+                                                        --     effect.Anchored = true
+                                                        --     effect.CanCollide = false
+                                                        --     effect.Parent = workspace
+                                                        --     
+                                                        --     game:GetService("Debris"):AddItem(effect, 0.5)
+                                                        -- end
                                                     end
                                                 end
                                             end
@@ -950,6 +1000,305 @@ MiscTab:CreateSlider({
     end,
 })
 
+-- Fling Feature
+MiscTab:CreateToggle({
+    Name = "[Fling]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().FlingEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().FlingEnabled do
+                    pcall(function()
+                        local localPlayer = game.Players.LocalPlayer
+                        local char = localPlayer.Character
+                        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                        
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        
+                        -- Find target based on selection
+                        local target = nil
+                        local flingMode = getgenv().FlingMode or "Murderer"
+                        
+                        if flingMode == "Murderer" then
+                            -- Find murderer (has knife)
+                            for _, player in ipairs(game.Players:GetPlayers()) do
+                                if player ~= localPlayer then
+                                    local playerChar = player.Character
+                                    if playerChar and playerChar:FindFirstChild("HumanoidRootPart") then
+                                        local knife = playerChar:FindFirstChild("Knife") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChild("Knife"))
+                                        if knife then
+                                            target = player
+                                            break
+                                        end
+                                    end
+                                end
+                        elseif flingMode == "Sheriff" then
+                            -- Find sheriff (has gun)
+                            for _, player in ipairs(game.Players:GetPlayers()) do
+                                if player ~= localPlayer then
+                                    local playerChar = player.Character
+                                    if playerChar and playerChar:FindFirstChild("HumanoidRootPart") then
+                                        local gun = playerChar:FindFirstChild("Gun") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChild("Gun"))
+                                        if gun then
+                                            target = player
+                                            break
+                                        end
+                                    end
+                                end
+                        elseif flingMode == "All" then
+                            -- Target closest player
+                            target = getClosestPlayer()
+                        end
+                        
+                        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                            local targetHrp = target.Character:FindFirstChild("HumanoidRootPart")
+                            local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+                            
+                            -- FLING THE TARGET OUT OF MAP
+                            local flingPower = getgenv().FlingPower or 500
+                            local flingDirection = (targetHrp.Position - hrp.Position).Unit
+                            
+                            -- Apply massive velocity to fling target out of map
+                            targetHumanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                            targetHrp.Velocity = flingDirection * flingPower
+                            
+                            -- Add extra upward velocity to ensure they go out of map
+                            targetHrp.Velocity = targetHrp.Velocity + Vector3.new(0, 1000, 0)
+                            
+                            -- Apply instant kill damage
+                            targetHumanoid:TakeDamage(100) -- Massive damage to ensure kill
+                            
+                            -- Add spin effect for dramatic effect
+                            local bodyVelocity = Instance.new("BodyVelocity")
+                            bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                            bodyVelocity.P = 50000
+                            bodyVelocity.velocity = Vector3.new(math.random(-1000, 1000), math.random(-1000, 1000), math.random(-1000, 1000))
+                            bodyVelocity.Parent = targetHrp
+                            
+                            -- Create visual effect
+                            local flingEffect = Instance.new("Part")
+                            flingEffect.Size = Vector3.new(3, 3, 3)
+                            flingEffect.BrickColor = BrickColor.new("Really red")
+                            flingEffect.Material = Enum.Material.Neon
+                            flingEffect.Anchored = true
+                            flingEffect.CanCollide = false
+                            flingEffect.Position = targetHrp.Position
+                            flingEffect.Parent = workspace
+                            
+                            -- Notification
+                            if Rayfield then
+                                Rayfield:Notify({
+                                    Title = "Fling",
+                                    Content = "Flinging " .. target.Name .. " out of map!",
+                                    Duration = 2
+                                })
+                            end
+                            
+                            -- Clean up after delay
+                            game:GetService("Debris"):AddItem(flingEffect, 2)
+                            game:GetService("Debris"):AddItem(bodyVelocity, 1)
+                        end
+                    end)
+                    task.wait(0.5) -- Check every 0.5 seconds
+                end
+            end)()
+        else
+            -- Clean up when disabled
+            pcall(function()
+                for _, obj in ipairs(workspace:GetChildren()) do
+                    if obj:IsA("BodyVelocity") then
+                        obj:Destroy()
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+-- Fling Mode Selection
+MiscTab:CreateDropdown({
+    Name = "[Fling Target]",
+    Options = {"Murderer", "Sheriff", "All"},
+    CurrentOption = "Murderer",
+    Callback = function(option)
+        getgenv().FlingMode = option
+        if Rayfield then
+            Rayfield:Notify({
+                Title = "Fling Mode",
+                Content = "Target: " .. option,
+                Duration = 2
+            })
+        end
+    end,
+})
+
+-- VC Bypass
+MiscTab:CreateToggle({
+    Name = "[VC Bypass]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().VCBypassEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().VCBypassEnabled do
+                    pcall(function()
+                        -- Method 1: Filter chat messages
+                        local chatService = game:GetService("Chat")
+                        local originalChatFunction = chatService.ChatBar.TargetText
+                        
+                        -- Create safe chat function
+                        local safeChatFunction = function(message)
+                            -- Filter common swear words
+                            local filteredMessage = message
+                            local swearWords = {
+                                "fuck", "shit", "bitch", "ass", "cunt", "dick", 
+                                "nigger", "fag", "retard", "idiot", "bastered",
+                                "motherfucker", "son of a bitch", "wtf", "stfu", " kys", "die"
+                            }
+                            
+                            -- Replace swear words with safe alternatives
+                            for _, swear in ipairs(swearWords) do
+                                local replacement = string.rep("*", string.len(swear))
+                                filteredMessage = string.gsub(filteredMessage:lower(), swear, replacement)
+                            end
+                            
+                            -- Add special characters to bypass filters
+                            local bypassChars = {
+                                "Ą", "Ć", "ć", "Ĉ", "ĉ", "Ċ", "ċ", "Č", "č", "Ď", "ď",
+                                "ą", "ć", "ę", "ė", "ę", "ě", "Ĝ", "ą", "ż", "ź", "ś", "ć",
+                                "á", "à", "â", "ä", "ã", "å", "æ", "œ", "ç", "é", "è", "ê", "ë",
+                                "í", "ï", "î", "ì", "ó", "ò", "ô", "ö", "õ", "ø", "ù", "û", "ü",
+                                "ý", "ÿ", "¡", "¢", "£", "¤", "¥", "₧", "₩", "₪", "₫", "€",
+                                "ß", "§", "†", "‡", "•", "‰", "‱", "‡", "†", "‡"
+                            }
+                            
+                            -- Randomly insert special characters
+                            for i = 1, #bypassChars do
+                                local charIndex = math.random(1, #bypassChars)
+                                filteredMessage = filteredMessage:sub(1, i) .. bypassChars[charIndex] .. filteredMessage:sub(i + 1)
+                            end
+                            
+                            -- Call original chat function with filtered message
+                            return originalChatFunction(filteredMessage)
+                        end
+                        
+                        -- Override chat function
+                        chatService.ChatBar.TargetText = safeChatFunction
+                        
+                        -- Method 2: Block VC audio detection
+                        local voiceChatService = game:GetService("VoiceChatService")
+                        if voiceChatService then
+                            -- Hook into voice chat events
+                            local originalConnect = voiceChatService.MainSpeakerStarted:Connect(function() end)
+                            
+                            -- Create safe voice chat handler
+                            voiceChatService.MainSpeakerStarted:Connect(function(speaker)
+                                if speaker == game.Players.LocalPlayer then
+                                    -- Prevent voice chat detection
+                                    speaker:SetAttribute("VCBypassActive", true)
+                                    
+                                    -- Hook into voice state changes
+                                    local originalStateChanged = speaker.StateChanged
+                                    speaker.StateChanged = function(newState)
+                                        if getgenv().VCBypassEnabled and speaker:GetAttribute("VCBypassActive") then
+                                            -- Block voice state reporting
+                                            return
+                                        end
+                                        
+                                        -- Call original with safe checks
+                                        return originalStateChanged(newState)
+                                    end
+                                end)
+                        end
+                        
+                        -- Method 3: Filter text chat
+                        local textChatService = game:GetService("TextChatService")
+                        if textChatService then
+                            local originalSendMessage = textChatService.SendMessage
+                            
+                            textChatService.SendMessage = function(textChannel, message)
+                                -- Filter message
+                                local filteredMessage = message
+                                local swearWords = {
+                                    "fuck", "shit", "bitch", "ass", "cunt", "dick", 
+                                    "nigger", "fag", "retard", "idiot", "bastered",
+                                    "motherfucker", "son of a bitch", "wtf", "stfu", " kys", "die"
+                                }
+                                
+                                -- Replace swear words with safe alternatives
+                                for _, swear in ipairs(swearWords) do
+                                    local replacement = string.rep("*", string.len(swear))
+                                    filteredMessage = string.gsub(filteredMessage:lower(), swear, replacement)
+                                end
+                                
+                                -- Add special characters to bypass filters
+                                local bypassChars = {
+                                    "Ą", "Ć", "ć", "Ĉ", "ĉ", "Ċ", "ċ", "Č", "č", "Ď", "ď",
+                                    "ą", "ć", "ę", "ė", "ę", "ě", "Ĝ", "ą", "ż", "ź", "ś", "ć",
+                                    "á", "à", "â", "ä", "ã", "å", "æ", "œ", "ç", "é", "è", "ê", "ë",
+                                    "í", "ï", "î", "ì", "ó", "ò", "ô", "ö", "õ", "ø", "ù", "û", "ü",
+                                    "ý", "ÿ", "¡", "¢", "£", "¤", "¥", "₧", "₩", "₪", "₫", "€",
+                                    "ß", "§", "†", "‡", "•", "‰", "‱", "‡", "†", "‡"
+                                }
+                                
+                                -- Randomly insert special characters
+                                for i = 1, #bypassChars do
+                                    local charIndex = math.random(1, #bypassChars)
+                                    filteredMessage = filteredMessage:sub(1, i) .. bypassChars[charIndex] .. filteredMessage:sub(i + 1)
+                                end
+                                
+                                -- Call original with filtered message
+                                return originalSendMessage(textChannel, filteredMessage)
+                            end
+                        end
+                        
+                        -- Method 4: Anti-VC detection system
+                        game:GetService("RunService").Heartbeat:Connect(function()
+                            if not getgenv().VCBypassEnabled then return end
+                            
+                            -- Check if local player is muted
+                            local localPlayer = game.Players.LocalPlayer
+                            if localPlayer and localPlayer:FindFirstChild("HumanoidRootPart") then
+                                -- Prevent automatic muting for swearing
+                                localPlayer.Character:FindFirstChild("Humanoid").Health = 100
+                            end
+                        end)
+                        
+                        if Rayfield then
+                            Rayfield:Notify({
+                                Title = "VC Bypass",
+                                Content = "VC Bypass activated!",
+                                Duration = 3
+                            })
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)()
+        else
+            -- Clean up when disabled
+            pcall(function()
+                local chatService = game:GetService("Chat")
+                if chatService and chatService.ChatBar and chatService.ChatBar.TargetText ~= nil then
+                    -- Restore original chat function
+                    chatService.ChatBar.TargetText = nil
+                end
+                
+                local voiceChatService = game:GetService("VoiceChatService")
+                if voiceChatService then
+                    -- Clean up voice chat hooks
+                    for _, speaker in pairs(voiceChatService:GetSpeakers()) do
+                        if speaker:GetAttribute("VCBypassActive") then
+                            speaker:SetAttribute("VCBypassActive", nil)
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
 -- Coin Auto Farm
 MiscTab:CreateToggle({
     Name = "[Coin Auto Farm]",
@@ -968,26 +1317,27 @@ MiscTab:CreateToggle({
                         local originalPosition = hrp.Position
                         local coinsCollected = 0
                         
-                        -- Simple and effective coin detection
-                        for _, obj in ipairs(workspace:GetChildren()) do
+                        -- COMPREHENSIVE COIN SEARCH - Check entire workspace
+                        for _, obj in ipairs(workspace:GetDescendants()) do
                             if not getgenv().CoinAutoFarmEnabled then break end
                             
-                            -- Check if it's a coin (simplified detection)
                             local isCoin = false
                             
-                            -- Method 1: Check by name
+                            -- METHOD 1: Name detection
                             local name = obj.Name:lower()
                             if name:find("coin") or name:find("money") or name:find("cash") or name:find("shard") or name:find("gem") then
                                 isCoin = true
                             end
                             
-                            -- Method 2: Check by appearance
+                            -- METHOD 2: Color detection
                             if not isCoin and obj:IsA("Part") then
                                 local coinColors = {
                                     BrickColor.new("Bright yellow"),
                                     BrickColor.new("Yellow"),
+                                    BrickColor.new("New Yeller"),
                                     BrickColor.new("Gold"),
-                                    BrickColor.new("New Yeller")
+                                    BrickColor.new("Bright orange"),
+                                    BrickColor.new("Pastel yellow")
                                 }
                                 
                                 for _, color in ipairs(coinColors) do
@@ -998,30 +1348,45 @@ MiscTab:CreateToggle({
                                 end
                             end
                             
-                            -- Method 3: Check by collection properties
+                            -- METHOD 3: Collection properties detection
                             if not isCoin and obj:IsA("Part") then
-                                if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") then
+                                if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") or obj:FindFirstChild("ProximityPrompt") then
                                     if obj.Size.X <= 3 and obj.Size.Y <= 3 and obj.Size.Z <= 3 then
                                         isCoin = true
                                     end
                                 end
                             end
                             
-                            -- Collect the coin if detected
+                            -- METHOD 4: MeshPart detection
+                            if not isCoin and obj:IsA("MeshPart") then
+                                local name = obj.Name:lower()
+                                if name:find("coin") or name:find("money") then
+                                    isCoin = true
+                                end
+                            end
+                            
+                            -- COLLECT THE COIN IF DETECTED
                             if isCoin and obj.Parent then
                                 local distance = (obj.Position - hrp.Position).Magnitude
-                                if distance <= 500 then -- Collection range
+                                if distance <= 2000 then -- Large collection range
                                     
-                                    -- TELEPORT TO COIN
+                                    -- TELEPORT TO COIN WITH SPEED
                                     hrp.Position = obj.Position
-                                    task.wait(0.1)
+                                    task.wait(0.02) -- Faster teleport
                                     
-                                    -- COLLECTION METHOD 1: Touch the coin
+                                    -- ENABLE NO CLIP FOR FASTER COLLECTION
+                                    for _, part in ipairs(char:GetChildren()) do
+                                        if part:IsA("BasePart") then
+                                            part.CanCollide = false
+                                        end
+                                    end
+                                    
+                                    -- COLLECTION ATTEMPT 1: Direct touch
                                     obj.CanCollide = false
                                     obj.Position = hrp.Position
-                                    task.wait(0.1)
+                                    task.wait(0.02) -- Faster touch
                                     
-                                    -- COLLECTION METHOD 2: Fire touch events
+                                    -- COLLECTION ATTEMPT 2: Fire touch events
                                     if obj:FindFirstChild("TouchTransmitter") then
                                         local touch = obj:FindFirstChild("TouchTransmitter")
                                         for _, connection in pairs(touch:GetConnectedChildren()) do
@@ -1031,37 +1396,37 @@ MiscTab:CreateToggle({
                                         end
                                     end
                                     
-                                    -- COLLECTION METHOD 3: Click detector
+                                    -- COLLECTION ATTEMPT 3: Click detector
                                     if obj:FindFirstChild("ClickDetector") then
                                         local click = obj:FindFirstChild("ClickDetector")
                                         click.MaxActivationDistance = 1000
                                         fireclickdetector(click)
                                     end
                                     
-                                    -- COLLECTION METHOD 4: Proximity prompt
+                                    -- COLLECTION ATTEMPT 4: Proximity prompt
                                     if obj:FindFirstChild("ProximityPrompt") then
                                         local prompt = obj:FindFirstChild("ProximityPrompt")
                                         prompt.MaxActivationDistance = 1000
                                         prompt:InputHoldEnded()
                                     end
                                     
-                                    -- COLLECTION METHOD 5: Force collection
+                                    -- COLLECTION ATTEMPT 5: Force collection
                                     if obj.Parent then
                                         obj.Anchored = false
                                         obj.Position = hrp.Position
-                                        task.wait(0.1)
+                                        task.wait(0.05)
                                     end
                                     
-                                    -- Check if coin was collected
+                                    -- CHECK IF COLLECTED
                                     if not obj.Parent then
                                         coinsCollected = coinsCollected + 1
                                     else
-                                        -- Force collect if still there
+                                        -- FORCE COLLECT
                                         obj:Destroy()
                                         coinsCollected = coinsCollected + 1
                                     end
                                     
-                                    task.wait(0.2) -- Small delay between coins
+                                    task.wait(0.1) -- Small delay between coins
                                 end
                             end
                         end
@@ -1078,9 +1443,9 @@ MiscTab:CreateToggle({
                             })
                         end
                         
-                        task.wait(3) -- Wait before next cycle
+                        task.wait(2) -- Wait before next cycle
                     end)
-                    task.wait(1) -- Check every second
+                    task.wait(0.5) -- Check every 0.5 seconds (faster)
                 end
             end)()
         else
