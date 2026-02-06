@@ -217,6 +217,20 @@ AimbotTab:CreateToggle({
     end,
 })
 
+-- Aimbot Keybind (Q Key)
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.Q then
+        getgenv().AimbotEnabled = not getgenv().AimbotEnabled
+        if Rayfield then
+            Rayfield:Notify({
+                Title = "Aimbot",
+                Content = "Aimbot " .. (getgenv().AimbotEnabled and "Enabled" or "Disabled") .. " (Q Key)",
+                Duration = 2
+            })
+        end
+    end
+end)
+
 -- Aimbot Settings ⚙️
 AimbotTab:CreateSlider({
     Name = "⚙️ Aimbot Smoothness",
@@ -741,7 +755,7 @@ MiscTab:CreateToggle({
                         local transparency = getgenv().HitboxTransparency or 0.5
                         
                         for _, player in ipairs(game.Players:GetPlayers()) do
-                            if player ~= localPlayer then
+                            if player ~= localPlayer then -- CRITICAL: Only affect OTHER players
                                 local char = player.Character
                                 if char and char:FindFirstChild("HumanoidRootPart") then
                                     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -778,10 +792,11 @@ MiscTab:CreateToggle({
                                         local weld = Instance.new("WeldConstraint")
                                         weld.Part0 = hrp
                                         weld.Part1 = hitbox
-                                        weld.Parent = hitbox
+                                        weld.Parent = weld
                                         
                                         -- Store reference to real player
                                         hitbox:SetAttribute("RealPlayer", player)
+                                        hitbox:SetAttribute("IsPlayerHitbox", true)
                                     end
                                     
                                     -- Update hitbox size
@@ -820,10 +835,10 @@ MiscTab:CreateToggle({
                                                                 return
                                                             else
                                                                 -- This is an expanded hitbox hit, force damage
-                                                                if tool.Name == "Knife" and player ~= localPlayer then
+                                                                if tool.Name == "Knife" and player ~= localPlayer then -- EXTRA PROTECTION
                                                                     -- Knife hit - apply damage directly
                                                                     humanoid:TakeDamage(40) -- Typical knife damage
-                                                                elseif tool.Name == "Gun" and player ~= localPlayer then
+                                                                elseif tool.Name == "Gun" and player ~= localPlayer then -- EXTRA PROTECTION
                                                                     -- Gun hit - apply damage directly
                                                                     humanoid:TakeDamage(20) -- Typical gun damage
                                                                 end
@@ -835,6 +850,34 @@ MiscTab:CreateToggle({
                                         end)
                                     end
                                 end
+                            end
+                        end
+                        
+                        -- CRITICAL: Ensure local player is never affected
+                        local localChar = localPlayer.Character
+                        if localChar then
+                            -- Remove any hitbox expanders from local player
+                            local localHrp = localChar:FindFirstChild("HumanoidRootPart")
+                            if localHrp then
+                                local hitbox = localHrp:FindFirstChild("FunctionalHitbox")
+                                if hitbox then
+                                    hitbox:Destroy()
+                                end
+                            end
+                            
+                            -- Restore local player's body part sizes
+                            for _, part in ipairs(localChar:GetChildren()) do
+                                if part:IsA("BasePart") and part:GetAttribute("OriginalSize") then
+                                    part.Size = part:GetAttribute("OriginalSize")
+                                    part:SetAttribute("OriginalSize", nil)
+                                end
+                            end
+                            
+                            -- Remove hitbox hook from local player's humanoid
+                            local localHumanoid = localChar:FindFirstChild("Humanoid")
+                            if localHumanoid then
+                                localHumanoid:SetAttribute("HitboxHooked", nil)
+                                localHumanoid:SetAttribute("OriginalHealth", nil)
                             end
                         end
                     end)
@@ -895,6 +938,64 @@ MiscTab:CreateSlider({
     CurrentValue = 0.5,
     Callback = function(value)
         getgenv().HitboxTransparency = value
+    end,
+})
+
+-- Coin Auto Farm
+MiscTab:CreateToggle({
+    Name = "[Coin Auto Farm]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().CoinAutoFarmEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().CoinAutoFarmEnabled do
+                    pcall(function()
+                        local localPlayer = game.Players.LocalPlayer
+                        local char = localPlayer.Character
+                        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                        
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        local collected = 0
+                        
+                        -- Search for coins in workspace
+                        for _, obj in ipairs(workspace:GetDescendants()) do
+                            if obj:IsA("Part") and (obj.Name:find("Coin") or obj.Name:find("Money") or obj.BrickColor == BrickColor.new("Bright yellow")) then
+                                local coin = obj
+                                local distance = (coin.Position - hrp.Position).Magnitude
+                                
+                                -- If coin is within reasonable range, teleport to it and collect
+                                if distance <= 100 then -- Only farm coins within 100 studs
+                                    local originalPosition = hrp.Position
+                                    
+                                    -- Teleport to coin
+                                    hrp.Position = coin.Position
+                                    task.wait(0.2)
+                                    
+                                    -- Try to collect the coin (touch it)
+                                    coin.CanCollide = false
+                                    coin.Position = hrp.Position
+                                    task.wait(0.1)
+                                    
+                                    -- Return to original position
+                                    hrp.Position = originalPosition
+                                    collected = collected + 1
+                                    
+                                    -- Small delay between collections
+                                    task.wait(0.3)
+                                    
+                                    -- Break after collecting a few coins to avoid being too obvious
+                                    if collected >= 5 then
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(2) -- Check every 2 seconds
+                end
+            end)()
+        end
     end,
 })
 
@@ -1035,6 +1136,7 @@ CreditsDiscordTab:CreateButton({
         getgenv().AutoGrabGunEnabled = false
         getgenv().HitboxExpanderEnabled = false
         getgenv().MagicBulletEnabled = false
+        getgenv().CoinAutoFarmEnabled = false
         
         -- Clean up ESP
         pcall(function()
