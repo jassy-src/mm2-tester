@@ -236,6 +236,128 @@ AimbotTab:CreateToggle({
     end,
 })
 
+-- Magic Bullet Toggle
+AimbotTab:CreateToggle({
+    Name = "🪄 Magic Bullet",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().MagicBulletEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().MagicBulletEnabled do
+                    pcall(function()
+                        local localPlayer = game.Players.LocalPlayer
+                        local char = localPlayer.Character
+                        if not char then return end
+                        
+                        local tool = char:FindFirstChildWhichIsA("Tool")
+                        if tool and tool.Name == "Gun" then
+                            -- Find the closest target
+                            local target = getClosestPlayer()
+                            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                                local targetPos = target.Character:FindFirstChild("HumanoidRootPart").Position
+                                
+                                -- Hook into the gun's firing mechanism
+                                local gunScript = tool:FindFirstChildWhichIsA("Script") or tool:FindFirstChildWhichIsA("LocalScript")
+                                if gunScript and not gunScript:GetAttribute("MagicBulletHooked") then
+                                    gunScript:SetAttribute("MagicBulletHooked", true)
+                                    
+                                    -- Create a bullet manipulation system
+                                    game:GetService("RunService").Heartbeat:Connect(function()
+                                        if not getgenv().MagicBulletEnabled then return end
+                                        
+                                        -- Look for newly created bullets
+                                        for _, obj in ipairs(workspace:GetDescendants()) do
+                                            if obj:IsA("Part") and obj.Name:find("Bullet") or obj.Name:find("Projectile") then
+                                                if not obj:GetAttribute("MagicBulletProcessed") then
+                                                    obj:SetAttribute("MagicBulletProcessed", true)
+                                                    
+                                                    -- Calculate trajectory to target
+                                                    local startPos = obj.Position
+                                                    local endPos = targetPos + Vector3.new(0, 1, 0) -- Aim at head/chest level
+                                                    
+                                                    -- Create a curved path
+                                                    local curveIntensity = getgenv().MagicBulletIntensity or 5
+                                                    local midPoint = (startPos + endPos) / 2 + Vector3.new(0, curveIntensity, 0)
+                                                    
+                                                    -- Animate the bullet along the curved path
+                                                    local startTime = tick()
+                                                    local duration = 0.2 -- Time to reach target
+                                                    
+                                                    local connection
+                                                    connection = game:GetService("RunService").Heartbeat:Connect(function()
+                                                        local elapsed = tick() - startTime
+                                                        local progress = math.min(elapsed / duration, 1)
+                                                        
+                                                        -- Quadratic Bezier curve for smooth curving
+                                                        local t = progress
+                                                        local curvePos = (1-t)^2 * startPos + 2*(1-t)*t * midPoint + t^2 * endPos
+                                                        
+                                                        obj.Position = curvePos
+                                                        
+                                                        -- Make the bullet look at the target
+                                                        if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                                                            obj.CFrame = CFrame.lookAt(curvePos, target.Character:FindFirstChild("HumanoidRootPart").Position)
+                                                        end
+                                                        
+                                                        -- When bullet reaches target, ensure hit registration
+                                                        if progress >= 1 then
+                                                            -- Force hit registration
+                                                            local targetChar = target.Character
+                                                            if targetChar then
+                                                                local humanoid = targetChar:FindFirstChild("Humanoid")
+                                                                if humanoid then
+                                                                    -- Apply damage directly
+                                                                    humanoid:TakeDamage(20)
+                                                                    
+                                                                    -- Create visual effect
+                                                                    local hitEffect = Instance.new("Part")
+                                                                    hitEffect.Size = Vector3.new(1, 1, 1)
+                                                                    hitEffect.Position = endPos
+                                                                    hitEffect.BrickColor = BrickColor.new("Really red")
+                                                                    hitEffect.Material = Enum.Material.Neon
+                                                                    hitEffect.Anchored = true
+                                                                    hitEffect.CanCollide = false
+                                                                    hitEffect.Parent = workspace
+                                                                    
+                                                                    -- Remove effect after short time
+                                                                    game:GetService("Debris"):AddItem(hitEffect, 0.5)
+                                                                end
+                                                            end
+                                                            
+                                                            -- Remove the bullet
+                                                            obj:Destroy()
+                                                            if connection then
+                                                                connection:Disconnect()
+                                                            end
+                                                        end
+                                                    end)
+                                                end
+                                            end
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        end
+    end,
+})
+
+-- Magic Bullet Intensity Slider
+AimbotTab:CreateSlider({
+    Name = "🪄 Bullet Curve Intensity",
+    Range = {0, 20},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(value)
+        getgenv().MagicBulletIntensity = value
+    end,
+})
+
 -- Aimbot Function
 local camera = game.Workspace.CurrentCamera
 local target = nil
@@ -624,11 +746,26 @@ MiscTab:CreateToggle({
                                 if char and char:FindFirstChild("HumanoidRootPart") then
                                     local hrp = char:FindFirstChild("HumanoidRootPart")
                                     
-                                    -- Create or update hitbox expander
-                                    local hitbox = hrp:FindFirstChild("HitboxExpander")
+                                    -- Method 1: Directly scale the player's body parts
+                                    for _, part in ipairs(char:GetChildren()) do
+                                        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                                            -- Store original size if not already stored
+                                            if not part:GetAttribute("OriginalSize") then
+                                                part:SetAttribute("OriginalSize", part.Size)
+                                            end
+                                            
+                                            -- Scale the part based on hitbox size multiplier
+                                            local originalSize = part:GetAttribute("OriginalSize")
+                                            local scaleFactor = 1 + (hitboxSize / 10) -- Scale factor based on slider
+                                            part.Size = originalSize * scaleFactor
+                                        end
+                                    end
+                                    
+                                    -- Method 2: Create invisible hitbox parts that transfer damage
+                                    local hitbox = hrp:FindFirstChild("FunctionalHitbox")
                                     if not hitbox then
                                         hitbox = Instance.new("Part")
-                                        hitbox.Name = "HitboxExpander"
+                                        hitbox.Name = "FunctionalHitbox"
                                         hitbox.Anchored = false
                                         hitbox.CanCollide = false
                                         hitbox.Massless = true
@@ -636,21 +773,66 @@ MiscTab:CreateToggle({
                                         hitbox.BrickColor = BrickColor.new("Really red")
                                         hitbox.Material = Enum.Material.ForceField
                                         hitbox.Parent = hrp
-                                    end
-                                    
-                                    -- Update hitbox size and position
-                                    hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                                    hitbox.Position = hrp.Position
-                                    
-                                    -- Weld to player
-                                    local weld = hitbox:FindFirstChild("Weld")
-                                    if not weld then
-                                        weld = Instance.new("Weld")
-                                        weld.Name = "Weld"
+                                        
+                                        -- Use WeldConstraint for better syncing
+                                        local weld = Instance.new("WeldConstraint")
                                         weld.Part0 = hrp
                                         weld.Part1 = hitbox
-                                        weld.C0 = CFrame.new(0, 0, 0)
                                         weld.Parent = hitbox
+                                        
+                                        -- Store reference to real player
+                                        hitbox:SetAttribute("RealPlayer", player)
+                                    end
+                                    
+                                    -- Update hitbox size
+                                    hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                                    hitbox.Transparency = transparency
+                                    
+                                    -- Method 3: Hook into the game's damage system
+                                    local humanoid = char:FindFirstChild("Humanoid")
+                                    if humanoid and not humanoid:GetAttribute("HitboxHooked") then
+                                        humanoid:SetAttribute("HitboxHooked", true)
+                                        humanoid:SetAttribute("OriginalHealth", humanoid.Health)
+                                        
+                                        -- Create a connection to detect when player should take damage
+                                        local connection
+                                        connection = game:GetService("RunService").Heartbeat:Connect(function()
+                                            if not getgenv().HitboxExpanderEnabled or not humanoid or not humanoid.Parent then
+                                                if connection then
+                                                    connection:Disconnect()
+                                                end
+                                                return
+                                            end
+                                            
+                                            -- Check if local player's weapon is near the expanded hitbox
+                                            local localChar = localPlayer.Character
+                                            if localChar then
+                                                local tool = localChar:FindFirstChildWhichIsA("Tool") or localPlayer.Backpack:FindFirstChildWhichIsA("Tool")
+                                                if tool and (tool.Name == "Knife" or tool.Name == "Gun") then
+                                                    local toolHandle = tool:FindFirstChild("Handle")
+                                                    if toolHandle then
+                                                        local distance = (toolHandle.Position - hrp.Position).Magnitude
+                                                        if distance <= hitboxSize then
+                                                            -- Simulate a direct hit on the player
+                                                            local originalDistance = (toolHandle.Position - hrp.Position).Magnitude
+                                                            if originalDistance <= 2 then -- Normal hit range
+                                                                -- This is a normal hit, let game handle it
+                                                                return
+                                                            else
+                                                                -- This is an expanded hitbox hit, force damage
+                                                                if tool.Name == "Knife" and player ~= localPlayer then
+                                                                    -- Knife hit - apply damage directly
+                                                                    humanoid:TakeDamage(40) -- Typical knife damage
+                                                                elseif tool.Name == "Gun" and player ~= localPlayer then
+                                                                    -- Gun hit - apply damage directly
+                                                                    humanoid:TakeDamage(20) -- Typical gun damage
+                                                                end
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end)
                                     end
                                 end
                             end
@@ -660,15 +842,32 @@ MiscTab:CreateToggle({
                 end
             end)()
         else
-            -- Clean up hitbox expanders when disabled
+            -- Clean up hitbox expanders and restore original sizes when disabled
             pcall(function()
                 for _, player in ipairs(game.Players:GetPlayers()) do
                     local char = player.Character
                     if char and char:FindFirstChild("HumanoidRootPart") then
                         local hrp = char:FindFirstChild("HumanoidRootPart")
-                        local hitbox = hrp:FindFirstChild("HitboxExpander")
+                        
+                        -- Remove functional hitbox
+                        local hitbox = hrp:FindFirstChild("FunctionalHitbox")
                         if hitbox then
                             hitbox:Destroy()
+                        end
+                        
+                        -- Restore original body part sizes
+                        for _, part in ipairs(char:GetChildren()) do
+                            if part:IsA("BasePart") and part:GetAttribute("OriginalSize") then
+                                part.Size = part:GetAttribute("OriginalSize")
+                                part:SetAttribute("OriginalSize", nil)
+                            end
+                        end
+                        
+                        -- Remove hitbox hook from humanoid
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        if humanoid then
+                            humanoid:SetAttribute("HitboxHooked", nil)
+                            humanoid:SetAttribute("OriginalHealth", nil)
                         end
                     end
                 end
@@ -835,6 +1034,7 @@ CreditsDiscordTab:CreateButton({
         getgenv().AntiCheatBypass = false
         getgenv().AutoGrabGunEnabled = false
         getgenv().HitboxExpanderEnabled = false
+        getgenv().MagicBulletEnabled = false
         
         -- Clean up ESP
         pcall(function()
