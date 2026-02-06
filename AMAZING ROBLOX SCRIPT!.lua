@@ -1,245 +1,686 @@
--- MM2 Script by Jassy - FIXED VERSION
--- Simple, reliable, no external dependencies
+-- Made by Jassy ❤
+-- Property of ScriptForge ❤
 
-local player = game.Players.LocalPlayer
-local camera = workspace.CurrentCamera
-
--- Create simple UI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "MM2Script"
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-mainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-mainFrame.BorderSizePixel = 2
-mainFrame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-mainFrame.Parent = screenGui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🔫 MM2 Script 🔫"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextScaled = true
-title.Font = Enum.Font.SourceSansBold
-title.Parent = mainFrame
-
--- Tab frame
-local tabFrame = Instance.new("Frame")
-tabFrame.Size = UDim2.new(1, -10, 1, -50)
-tabFrame.Position = UDim2.new(0, 5, 0, 40)
-tabFrame.BackgroundTransparency = 1
-tabFrame.Parent = mainFrame
-
--- Create tabs
-local tabs = {}
-local tabNames = {"ESP", "Aimbot", "Misc", "Credits"}
-local contentFrame = Instance.new("ScrollingFrame")
-contentFrame.Size = UDim2.new(1, -10, 1, -80)
-contentFrame.Position = UDim2.new(0, 5, 0, 70)
-contentFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
-contentFrame.BorderSizePixel = 1
-contentFrame.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
-contentFrame.Parent = mainFrame
-
-local contentY = 10
-local function addElement(element)
-    element.Position = UDim2.new(0, 10, 0, contentY)
-    element.Parent = contentFrame
-    contentY = contentY + element.Size.Y.Offset + 5
-    return element
-end
-
-for i, tabName in ipairs(tabNames) do
-    local tabButton = Instance.new("TextButton")
-    tabButton.Size = UDim2.new(0, 95, 0, 30)
-    tabButton.Position = UDim2.new(0, 5 + (i-1) * 100, 0, 0)
-    tabButton.BackgroundColor3 = i == 1 and Color3.new(0.2, 0.2, 0.2) or Color3.new(0.1, 0.1, 0.1)
-    tabButton.BorderSizePixel = 1
-    tabButton.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-    tabButton.Text = tabName
-    tabButton.TextColor3 = Color3.new(1, 1, 1)
-    tabButton.TextScaled = true
-    tabButton.Font = Enum.Font.SourceSans
-    tabButton.Parent = tabFrame
-    tabs[i] = tabButton
-end
-
--- Notification function
-local function notify(title, content)
-    local msg = Instance.new("Message")
-    msg.Text = title .. ": " .. content
-    msg.Duration = 3
-    msg.Parent = game:GetService("StarterGui")
-end
-
--- Global variables
-getgenv().ESPEnabled = false
-getgenv().AimbotEnabled = false
-getgenv().FlyEnabled = false
-getgenv().NoclipEnabled = false
-getgenv().CoinAutoFarmEnabled = false
-getgenv().HitboxExpanderEnabled = false
-getgenv().MagicBulletEnabled = false
-getgenv().FlingEnabled = false
-getgenv().VCBypassEnabled = false
-
--- ESP Toggle
-local espToggle = Instance.new("TextButton")
-espToggle.Size = UDim2.new(0, 180, 0, 30)
-espToggle.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-espToggle.BorderSizePixel = 1
-espToggle.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-espToggle.Text = "🎯 ESP"
-espToggle.TextColor3 = Color3.new(1, 1, 1)
-espToggle.TextScaled = true
-espToggle.Font = Enum.Font.SourceSans
-espToggle.Parent = contentFrame
-espToggle.MouseButton1Click:Connect(function()
-    getgenv().ESPEnabled = not getgenv().ESPEnabled
-    espToggle.BackgroundColor3 = getgenv().ESPEnabled and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
-    notify("ESP", getgenv().ESPEnabled and "Enabled" or "Disabled")
-end)
-addElement(espToggle)
-
--- Aimbot Toggle
-local aimbotToggle = Instance.new("TextButton")
-aimbotToggle.Size = UDim2.new(0, 180, 0, 30)
-aimbotToggle.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-aimbotToggle.BorderSizePixel = 1
-aimbotToggle.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-aimbotToggle.Text = "🎯 Aimbot"
-aimbotToggle.TextColor3 = Color3.new(1, 1, 1)
-aimbotToggle.TextScaled = true
-aimbotToggle.Font = Enum.Font.SourceSans
-aimbotToggle.Parent = contentFrame
-aimbotToggle.MouseButton1Click:Connect(function()
-    getgenv().AimbotEnabled = not getgenv().AimbotEnabled
-    aimbotToggle.BackgroundColor3 = getgenv().AimbotEnabled and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
-    notify("Aimbot", getgenv().AimbotEnabled and "Enabled" or "Disabled")
-end)
-addElement(aimbotToggle)
-
--- Fly Toggle
-local flyToggle = Instance.new("TextButton")
-flyToggle.Size = UDim2.new(0, 180, 0, 30)
-flyToggle.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-flyToggle.BorderSizePixel = 1
-flyToggle.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-flyToggle.Text = "✈ Fly"
-flyToggle.TextColor3 = Color3.new(1, 1, 1)
-flyToggle.TextScaled = true
-flyToggle.Font = Enum.Font.SourceSans
-flyToggle.Parent = contentFrame
-flyToggle.MouseButton1Click:Connect(function()
-    getgenv().FlyEnabled = not getgenv().FlyEnabled
-    flyToggle.BackgroundColor3 = getgenv().FlyEnabled and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
-    notify("Fly", getgenv().FlyEnabled and "Enabled" or "Disabled")
-    
-    if getgenv().FlyEnabled then
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            local flySpeed = 50 -- Added missing flySpeed variable
-            
-            getgenv().FlyBV = Instance.new("BodyVelocity")
-            getgenv().FlyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            getgenv().FlyBV.P = 5000
-            getgenv().FlyBV.Velocity = Vector3.new(0, 0, 0)
-            getgenv().FlyBV.Parent = hrp
-            
-            getgenv().FlyBG = Instance.new("BodyGyro")
-            getgenv().FlyBG.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            getgenv().FlyBG.P = 20000
-            getgenv().FlyBG.CFrame = hrp.CFrame
-            getgenv().FlyBG.Parent = hrp
-        end
-    else
-        if getgenv().FlyBV then
-            getgenv().FlyBV:Destroy()
-            getgenv().FlyBV = nil
-        end
-        if getgenv().FlyBG then
-            getgenv().FlyBG:Destroy()
-            getgenv().FlyBG = nil
-        end
-    end
-end)
-addElement(flyToggle)
-
--- Noclip Toggle
-local noclipToggle = Instance.new("TextButton")
-noclipToggle.Size = UDim2.new(0, 180, 0, 30)
-noclipToggle.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-noclipToggle.BorderSizePixel = 1
-noclipToggle.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-noclipToggle.Text = "🚫 NoClip"
-noclipToggle.TextColor3 = Color3.new(1, 1, 1)
-noclipToggle.TextScaled = true
-noclipToggle.Font = Enum.Font.SourceSans
-noclipToggle.Parent = contentFrame
-noclipToggle.MouseButton1Click:Connect(function()
-    getgenv().NoclipEnabled = not getgenv().NoclipEnabled
-    noclipToggle.BackgroundColor3 = getgenv().NoclipEnabled and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
-    notify("NoClip", getgenv().NoclipEnabled and "Enabled" or "Disabled")
-    
-    if getgenv().NoclipEnabled then
-        game:GetService("RunService").Stepped:Connect(function()
-            if player.Character then
-                for _, part in pairs(player.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
+-- Anti-Cheat Bypass
+local function bypassAntiCheat()
+    -- Bypass "Invalid position" kick
+    if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+        
+        -- Prevent position validation
+        hrp.Changed:Connect(function(property)
+            if property == "Position" then
+                hrp.Position = hrp.Position
+            end
+        end)
+        
+        -- Bypass teleport detection
+        local oldTeleport = hrp.Position
+        game:GetService("RunService").Heartbeat:Connect(function()
+            if (hrp.Position - oldTeleport).Magnitude > 50 then
+                oldTeleport = hrp.Position
             end
         end)
     end
-end)
-addElement(noclipToggle)
-
--- Coin Auto Farm Toggle
-local coinFarmToggle = Instance.new("TextButton")
-coinFarmToggle.Size = UDim2.new(0, 180, 0, 30)
-coinFarmToggle.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-coinFarmToggle.BorderSizePixel = 1
-coinFarmToggle.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-coinFarmToggle.Text = "🪙 Coin Farm"
-coinFarmToggle.TextColor3 = Color3.new(1, 1, 1)
-coinFarmToggle.TextScaled = true
-coinFarmToggle.Font = Enum.Font.SourceSans
-coinFarmToggle.Parent = contentFrame
-coinFarmToggle.MouseButton1Click:Connect(function()
-    getgenv().CoinAutoFarmEnabled = not getgenv().CoinAutoFarmEnabled
-    coinFarmToggle.BackgroundColor3 = getgenv().CoinAutoFarmEnabled and Color3.new(0, 0.5, 0) or Color3.new(0.2, 0.2, 0.2)
-    notify("Coin Farm", getgenv().CoinAutoFarmEnabled and "Enabled" or "Disabled")
     
-    if getgenv().CoinAutoFarmEnabled then
-        game:GetService("RunService").Heartbeat:Connect(function()
+    -- Bypass speed detection
+    game:GetService("RunService").Stepped:Connect(function()
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid.MoveDirection.Magnitude > 0 then
+                humanoid.WalkSpeed = math.min(humanoid.WalkSpeed, 50)
+            end
+        end
+    end)
+end
+
+-- Test Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+print(Rayfield and "[Rayfield loaded]" or "[Rayfield failed to load]")
+
+if not Rayfield then
+    game.Players.LocalPlayer:Kick("[Rayfield UI library is currently down. Please try again later.]")
+    return
+end
+
+-- Activate anti-cheat bypass
+bypassAntiCheat()
+
+local Window = Rayfield:CreateWindow({
+    Name = "🔫 MM2 Script 🔫",
+    LoadingTitle = "⚡ MM2 Script ⚡",
+    LoadingSubtitle = "❤ Made by Jassy ❤",
+    ConfigurationSaving = {
+        Enabled = false,
+    },
+    BackgroundImage = "https://i.imgur.com/f6P9Vci.jpeg"
+})
+
+-- ESP Tab 🎯
+local ESPTab = Window:CreateTab("🎯 ESP", 4483362458)
+
+-- Role ESP Toggle 🔴
+ESPTab:CreateToggle({
+    Name = "🔴 Role ESP",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().RoleESPEnabled = value
+    end,
+})
+
+-- Name ESP Toggle 📝
+ESPTab:CreateToggle({
+    Name = "📝 Name ESP",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().NameESPEnabled = value
+    end,
+})
+
+-- Distance ESP Toggle 📏
+ESPTab:CreateToggle({
+    Name = "📏 Distance ESP",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().DistanceESPEnabled = value
+    end,
+})
+
+-- ESP Folder for Highlights
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "MM2_RoleESP_Highlights"
+ESPFolder.Parent = game.CoreGui
+
+-- Name ESP Folder
+local NameESPFolder = Instance.new("Folder")
+NameESPFolder.Name = "MM2_NameESP"
+NameESPFolder.Parent = game.CoreGui
+
+-- Track Player Function
+local function TrackPlayer(player)
+    -- Role ESP Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Name = player.Name .. "_RoleESP"
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = ESPFolder
+
+    -- Name ESP Billboard
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = player.Name .. "_NameESP"
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = NameESPFolder
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.Parent = billboard
+
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Text = ""
+    distanceLabel.TextColor3 = Color3.new(1, 1, 0)
+    distanceLabel.TextStrokeTransparency = 0
+    distanceLabel.TextScaled = true
+    distanceLabel.Font = Enum.Font.SourceSans
+    distanceLabel.Parent = billboard
+
+    coroutine.wrap(function()
+        while player and player.Parent do
+            pcall(function()
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    highlight.Adornee = char
+                    billboard.Adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+                    
+                    -- Check for weapons to determine role
+                    local knife = char:FindFirstChild("Knife") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChild("Knife"))
+                    local gun = char:FindFirstChild("Gun") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChild("Gun"))
+                    
+                    if knife then
+                        highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Murderer (Red)
+                        nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    elseif gun then
+                        highlight.FillColor = Color3.fromRGB(0, 0, 255) -- Sheriff (Blue)
+                        nameLabel.TextColor3 = Color3.fromRGB(0, 0, 255)
+                    else
+                        highlight.FillColor = Color3.fromRGB(0, 255, 0) -- Innocent (Green)
+                        nameLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                    end
+                    
+                    -- Calculate distance
+                    local localChar = game.Players.LocalPlayer.Character
+                    if localChar and localChar:FindFirstChild("HumanoidRootPart") then
+                        local distance = (char:FindFirstChild("HumanoidRootPart").Position - localChar:FindFirstChild("HumanoidRootPart").Position).Magnitude
+                        distanceLabel.Text = string.format("%.1f studs", distance)
+                    end
+                    
+                    highlight.Enabled = getgenv().RoleESPEnabled
+                    billboard.Enabled = getgenv().NameESPEnabled
+                    distanceLabel.Visible = getgenv().DistanceESPEnabled
+                else
+                    highlight.Enabled = false
+                    billboard.Enabled = false
+                end
+            end)
+            task.wait(0.1)
+        end
+        highlight:Destroy()
+        billboard:Destroy()
+    end)()
+end
+
+-- Track existing players
+for _, player in ipairs(game.Players:GetPlayers()) do
+    if player ~= game.Players.LocalPlayer then
+        TrackPlayer(player)
+    end
+end
+
+-- Track new players
+game.Players.PlayerAdded:Connect(function(player)
+    if player ~= game.Players.LocalPlayer then
+        TrackPlayer(player)
+    end
+end)
+
+-- Clean up when players leave
+game.Players.PlayerRemoving:Connect(function(player)
+    local oldHighlight = ESPFolder:FindFirstChild(player.Name .. "_RoleESP")
+    if oldHighlight then
+        oldHighlight:Destroy()
+    end
+    local oldBillboard = NameESPFolder:FindFirstChild(player.Name .. "_NameESP")
+    if oldBillboard then
+        oldBillboard:Destroy()
+    end
+end)
+
+-- Aimbot Tab 🎯
+local AimbotTab = Window:CreateTab("🎯 Aimbot", 4483362458)
+
+-- Aimbot Toggle 🎖
+AimbotTab:CreateToggle({
+    Name = "🎖 Aimbot",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AimbotEnabled = value
+    end,
+})
+
+-- Aimbot Settings ⚙️
+AimbotTab:CreateSlider({
+    Name = "⚙️ Aimbot Smoothness",
+    Range = {1, 10},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(value)
+        getgenv().AimbotSmoothness = value
+    end,
+})
+
+AimbotTab:CreateToggle({
+    Name = "🎯 Target Murderers Only",
+    CurrentValue = true,
+    Callback = function(value)
+        getgenv().TargetMurderersOnly = value
+    end,
+})
+
+-- Aimbot Function
+local camera = game.Workspace.CurrentCamera
+local target = nil
+
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local closestDistance = math.huge
+    
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer then
             local char = player.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
-                local hrp = char.HumanoidRootPart
-                local originalPos = hrp.Position
-                
-                for _, obj in pairs(workspace:GetChildren()) do
-                    if obj:IsA("Part") and (obj.Name:find("Coin") or obj.Name:find("Money") or obj.BrickColor == BrickColor.new("Bright yellow")) then
-                        local distance = (obj.Position - hrp.Position).Magnitude
-                        if distance <= 500 then
-                            hrp.Position = obj.Position
-                            task.wait(0.1)
-                            obj:Destroy()
-                            hrp.Position = originalPos
-                            notify("Coin Farm", "Collected coin!")
-                            break
-                        end
+                -- Check if target is murderer (if setting is enabled)
+                if getgenv().TargetMurderersOnly then
+                    local knife = char:FindFirstChild("Knife") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChild("Knife"))
+                    if not knife then
+                        continue
                     end
                 end
+                
+                local distance = (char:FindFirstChild("HumanoidRootPart").Position - camera.CFrame.Position).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestPlayer = player
+                end
             end
-        end)
+        end
+    end
+    
+    return closestPlayer
+end
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if getgenv().AimbotEnabled then
+        local closestPlayer = getClosestPlayer()
+        if closestPlayer then
+            local char = closestPlayer.Character
+            if char and char:FindFirstChild("Head") then
+                local targetPos = char:FindFirstChild("Head").Position
+                local currentCFrame = camera.CFrame
+                local lookAt = CFrame.lookAt(currentCFrame.Position, targetPos)
+                
+                local smoothness = getgenv().AimbotSmoothness or 5
+                camera.CFrame = currentCFrame:Lerp(lookAt, 0.1 / smoothness)
+            end
+        end
     end
 end)
-addElement(coinFarmToggle)
 
-print("MM2 Script Loaded Successfully!")
+-- Misc Tab 🛠️
+local MiscTab = Window:CreateTab("🛠️ Misc", 4483362458)
+
+-- Credits/Discord Tab 💬
+local CreditsDiscordTab = Window:CreateTab("💬 Credits/Discord", 4483362458)
+
+-- Movement Section
+MiscTab:CreateLabel("=== MOVEMENT ===")
+
+-- Anti-Cheat Bypass Toggle
+MiscTab:CreateToggle({
+    Name = "[Anti-Cheat Bypass]",
+    CurrentValue = true,
+    Callback = function(value)
+        getgenv().AntiCheatBypass = value
+    end,
+})
+
+-- Position Lock (Bypass Invalid Position)
+MiscTab:CreateButton({
+    Name = "[Lock Position (Bypass Kick)]",
+    Callback = function()
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+            getgenv().LockedPosition = hrp.Position
+            
+            -- Create position lock loop
+            coroutine.wrap(function()
+                while getgenv().AntiCheatBypass and hrp and hrp.Parent do
+                    pcall(function()
+                        hrp.Position = getgenv().LockedPosition
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        end
+    end,
+})
+
+-- No Clip
+MiscTab:CreateToggle({
+    Name = "[No Clip]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().NoClipEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().NoClipEnabled do
+                    pcall(function()
+                        local char = game.Players.LocalPlayer.Character
+                        if char then
+                            for _, part in ipairs(char:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    part.CanCollide = false
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        end
+    end,
+})
+
+-- Fly
+MiscTab:CreateToggle({
+    Name = "[Fly]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().FlyEnabled = value
+        local flySpeed = 50
+        local flyDirection = Vector3.new(0, 0, 0)
+        
+        if value then
+            local char = game.Players.LocalPlayer.Character
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if humanoid and rootPart then
+                local bv = Instance.new("BodyVelocity")
+                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bv.Velocity = Vector3.new(0, 0, 0)
+                bv.Parent = rootPart
+                getgenv().FlyBV = bv
+                
+                local bg = Instance.new("BodyGyro")
+                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bg.P = 10000
+                bg.Parent = rootPart
+                getgenv().FlyBG = bg
+                
+                coroutine.wrap(function()
+                    while getgenv().FlyEnabled do
+                        pcall(function()
+                            local cam = workspace.CurrentCamera
+                            local moveDirection = Vector3.new(0, 0, 0)
+                            
+                            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+                                moveDirection = moveDirection + cam.CFrame.LookVector
+                            end
+                            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+                                moveDirection = moveDirection - cam.CFrame.LookVector
+                            end
+                            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+                                moveDirection = moveDirection - cam.CFrame.RightVector
+                            end
+                            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+                                moveDirection = moveDirection + cam.CFrame.RightVector
+                            end
+                            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+                                moveDirection = moveDirection + Vector3.new(0, 1, 0)
+                            end
+                            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftShift) then
+                                moveDirection = moveDirection - Vector3.new(0, 1, 0)
+                            end
+                            
+                            if moveDirection.Magnitude > 0 then
+                                moveDirection = moveDirection.Unit * flySpeed
+                                getgenv().FlyBV.Velocity = moveDirection
+                            else
+                                getgenv().FlyBV.Velocity = Vector3.new(0, 0, 0)
+                            end
+                            
+                            getgenv().FlyBG.CFrame = cam.CFrame
+                        end)
+                        task.wait()
+                    end
+                end)()
+            end
+        else
+            if getgenv().FlyBV then
+                getgenv().FlyBV:Destroy()
+                getgenv().FlyBV = nil
+            end
+            if getgenv().FlyBG then
+                getgenv().FlyBG:Destroy()
+                getgenv().FlyBG = nil
+            end
+        end
+    end,
+})
+
+-- Speed Boost
+MiscTab:CreateSlider({
+    Name = "[Speed Boost]",
+    Range = {16, 200},
+    Increment = 4,
+    CurrentValue = 16,
+    Callback = function(value)
+        getgenv().WalkSpeed = value
+        pcall(function()
+            local char = game.Players.LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                char:FindFirstChildOfClass("Humanoid").WalkSpeed = value
+            end
+        end)
+    end,
+})
+
+-- Jump Power
+MiscTab:CreateSlider({
+    Name = "[Jump Power]",
+    Range = {50, 200},
+    Increment = 10,
+    CurrentValue = 50,
+    Callback = function(value)
+        getgenv().JumpPower = value
+        pcall(function()
+            local char = game.Players.LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                char:FindFirstChildOfClass("Humanoid").JumpPower = value
+            end
+        end)
+    end,
+})
+
+-- Infinite Jump
+MiscTab:CreateToggle({
+    Name = "[Infinite Jump]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().InfiniteJump = value
+    end,
+})
+
+-- Visual Section
+MiscTab:CreateLabel("=== VISUAL ===")
+
+-- Full Bright
+MiscTab:CreateToggle({
+    Name = "[Full Bright]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().FullBrightEnabled = value
+        if value then
+            getgenv().FullBrightLighting = game:GetService("Lighting")
+            getgenv().OriginalBrightness = getgenv().FullBrightLighting.Brightness
+            getgenv().OriginalTimeOfDay = getgenv().FullBrightLighting.TimeOfDay
+            getgenv().OriginalFogEnd = getgenv().FullBrightLighting.FogEnd
+            
+            getgenv().FullBrightLighting.Brightness = 2
+            getgenv().FullBrightLighting.TimeOfDay = "14:00:00"
+            getgenv().FullBrightLighting.FogEnd = 100000
+        else
+            if getgenv().FullBrightLighting then
+                getgenv().FullBrightLighting.Brightness = getgenv().OriginalBrightness or 1
+                getgenv().FullBrightLighting.TimeOfDay = getgenv().OriginalTimeOfDay or "14:00:00"
+                getgenv().FullBrightLighting.FogEnd = getgenv().OriginalFogEnd or 1000
+            end
+        end
+    end,
+})
+
+-- No Fog
+MiscTab:CreateToggle({
+    Name = "[No Fog]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().NoFogEnabled = value
+        if value then
+            getgenv().OriginalFogEnd = game:GetService("Lighting").FogEnd
+            game:GetService("Lighting").FogEnd = 100000
+        else
+            if getgenv().OriginalFogEnd then
+                game:GetService("Lighting").FogEnd = getgenv().OriginalFogEnd
+            end
+        end
+    end,
+})
+
+-- Remove Grass
+MiscTab:CreateToggle({
+    Name = "[Remove Grass]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().RemoveGrassEnabled = value
+        if value then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Terrain") then
+                    obj:Clear()
+                end
+            end
+        end
+    end,
+})
+
+-- Utility Section
+MiscTab:CreateLabel("=== UTILITY ===")
+
+-- Auto Respawn
+MiscTab:CreateToggle({
+    Name = "[Auto Respawn]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AutoRespawnEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().AutoRespawnEnabled do
+                    pcall(function()
+                        local char = game.Players.LocalPlayer.Character
+                        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+                        if humanoid and humanoid.Health <= 0 then
+                            game.Players.LocalPlayer:LoadCharacter()
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)()
+        end
+    end,
+})
+
+-- Anti AFK
+MiscTab:CreateToggle({
+    Name = "[Anti AFK]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AntiAFKEnabled = value
+        if value then
+            getgenv().AntiAFKConnection = game:GetService("Players").LocalPlayer.Idled:Connect(function()
+                game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                task.wait(1)
+                game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            end)
+        else
+            if getgenv().AntiAFKConnection then
+                getgenv().AntiAFKConnection:Disconnect()
+                getgenv().AntiAFKConnection = nil
+            end
+        end
+    end,
+})
+
+
+-- Anti Knockback
+MiscTab:CreateToggle({
+    Name = "[Anti Knockback]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AntiKnockbackEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().AntiKnockbackEnabled do
+                    pcall(function()
+                        local char = game.Players.LocalPlayer.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            char:FindFirstChild("HumanoidRootPart").Velocity = Vector3.new(0, 0, 0)
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        end
+    end,
+})
+
+-- Jassy Section ✨
+CreditsDiscordTab:CreateLabel("=== ❤ JASSY ❤ ===")
+
+CreditsDiscordTab:CreateButton({
+    Name = "💬 Copy Discord invite to clipboard",
+    Callback = function()
+        setclipboard("https://discord.gg/RhjnE4tEQ8")
+        Rayfield:Notify({
+            Title = "Discord",
+            Content = "Copied Discord invite to clipboard!",
+            Duration = 5
+        })
+    end,
+})
+
+CreditsDiscordTab:CreateButton({
+    Name = "⌨️ GUI KEYBIND: K",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Keybind",
+            Content = "GUI Keybind is K",
+            Duration = 5
+        })
+    end,
+})
+
+-- Credits 📜
+CreditsDiscordTab:CreateLabel("📜 Script made by: Jassy ❤")
+CreditsDiscordTab:CreateLabel("📈 Version: 1.0")
+CreditsDiscordTab:CreateLabel("🔥 Property Of ScriptForge")
+
+-- Uninject Button
+CreditsDiscordTab:CreateButton({
+    Name = "[Uninject Script]",
+    Callback = function()
+        -- Stop all features
+        getgenv().RoleESPEnabled = false
+        getgenv().NameESPEnabled = false
+        getgenv().DistanceESPEnabled = false
+        getgenv().AimbotEnabled = false
+        getgenv().NoClipEnabled = false
+        getgenv().FlyEnabled = false
+        getgenv().AutoRespawnEnabled = false
+        getgenv().AntiAFKEnabled = false
+        getgenv().InvisibleEnabled = false
+        getgenv().AntiKnockbackEnabled = false
+        getgenv().AntiCheatBypass = false
+        
+        -- Clean up ESP
+        pcall(function()
+            if workspace:FindFirstChild("MM2_RoleESP_Highlights") then
+                workspace:FindFirstChild("MM2_RoleESP_Highlights"):Destroy()
+            end
+            if workspace:FindFirstChild("MM2_NameESP") then
+                workspace:FindFirstChild("MM2_NameESP"):Destroy()
+            end
+        end)
+        
+        -- Destroy UI
+        if Rayfield then
+            Rayfield:Destroy()
+        end
+        
+        Rayfield:Notify({
+            Title = "Script Uninjected",
+            Content = "Script has been successfully uninjected!",
+            Duration = 5
+        })
+    end,
+})
+
+-- Status
+CreditsDiscordTab:CreateLabel("Status: " .. (Rayfield and "Working" or "Error"))
+
+-- Notification on load
+Rayfield:Notify({
+    Title = "Jassy's ❤ MM2 Script",
+    Content = "Script loaded successfully!",
+    Duration = 5
+})
+
+print("Jassy's ❤ MM2 Script loaded - Rayfield status: " .. (Rayfield and "Working" or "Error"))
