@@ -602,6 +602,103 @@ MiscTab:CreateToggle({
     end,
 })
 
+-- Hitbox Expander
+MiscTab:CreateToggle({
+    Name = "[Hitbox Expander]",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().HitboxExpanderEnabled = value
+        if value then
+            coroutine.wrap(function()
+                while getgenv().HitboxExpanderEnabled do
+                    pcall(function()
+                        local localPlayer = game.Players.LocalPlayer
+                        if not localPlayer.Character then return end
+                        
+                        local hitboxSize = getgenv().HitboxSize or 5
+                        local transparency = getgenv().HitboxTransparency or 0.5
+                        
+                        for _, player in ipairs(game.Players:GetPlayers()) do
+                            if player ~= localPlayer then
+                                local char = player.Character
+                                if char and char:FindFirstChild("HumanoidRootPart") then
+                                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                                    
+                                    -- Create or update hitbox expander
+                                    local hitbox = hrp:FindFirstChild("HitboxExpander")
+                                    if not hitbox then
+                                        hitbox = Instance.new("Part")
+                                        hitbox.Name = "HitboxExpander"
+                                        hitbox.Anchored = false
+                                        hitbox.CanCollide = false
+                                        hitbox.Massless = true
+                                        hitbox.Transparency = transparency
+                                        hitbox.BrickColor = BrickColor.new("Really red")
+                                        hitbox.Material = Enum.Material.ForceField
+                                        hitbox.Parent = hrp
+                                    end
+                                    
+                                    -- Update hitbox size and position
+                                    hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                                    hitbox.Position = hrp.Position
+                                    
+                                    -- Weld to player
+                                    local weld = hitbox:FindFirstChild("Weld")
+                                    if not weld then
+                                        weld = Instance.new("Weld")
+                                        weld.Name = "Weld"
+                                        weld.Part0 = hrp
+                                        weld.Part1 = hitbox
+                                        weld.C0 = CFrame.new(0, 0, 0)
+                                        weld.Parent = hitbox
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)()
+        else
+            -- Clean up hitbox expanders when disabled
+            pcall(function()
+                for _, player in ipairs(game.Players:GetPlayers()) do
+                    local char = player.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        local hitbox = hrp:FindFirstChild("HitboxExpander")
+                        if hitbox then
+                            hitbox:Destroy()
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+-- Hitbox Size Slider
+MiscTab:CreateSlider({
+    Name = "[Hitbox Size]",
+    Range = {1, 20},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(value)
+        getgenv().HitboxSize = value
+    end,
+})
+
+-- Hitbox Transparency Slider
+MiscTab:CreateSlider({
+    Name = "[Hitbox Transparency]",
+    Range = {0, 1},
+    Increment = 0.1,
+    CurrentValue = 0.5,
+    Callback = function(value)
+        getgenv().HitboxTransparency = value
+    end,
+})
+
 -- Auto Grab Gun
 MiscTab:CreateToggle({
     Name = "[Auto Grab Gun]",
@@ -737,6 +834,7 @@ CreditsDiscordTab:CreateButton({
         getgenv().AntiKnockbackEnabled = false
         getgenv().AntiCheatBypass = false
         getgenv().AutoGrabGunEnabled = false
+        getgenv().HitboxExpanderEnabled = false
         
         -- Clean up ESP
         pcall(function()
