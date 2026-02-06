@@ -957,101 +957,140 @@ MiscTab:CreateToggle({
                         
                         local hrp = char:FindFirstChild("HumanoidRootPart")
                         local originalPosition = hrp.Position
-                        local coinsFound = {}
+                        local coinsCollected = 0
                         
-                        -- Comprehensive coin search
+                        -- Find all coins with better detection
                         for _, obj in ipairs(workspace:GetDescendants()) do
+                            -- CRITICAL: Check if still enabled before each coin
+                            if not getgenv().CoinAutoFarmEnabled then 
+                                -- Return to original position immediately
+                                hrp.Position = originalPosition
+                                break 
+                            end
+                            
                             local isCoin = false
                             
-                            -- Multiple detection methods
-                            if obj:IsA("Part") or obj:IsA("MeshPart") then
-                                -- Check by name
-                                if obj.Name:lower():find("coin") or obj.Name:lower():find("money") or obj.Name:lower():find("cash") then
+                            -- Enhanced coin detection
+                            if obj:IsA("Part") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
+                                -- Check by name (case insensitive)
+                                local name = obj.Name:lower()
+                                if name:find("coin") or name:find("money") or name:find("cash") or name:find("shard") or name:find("gem") then
                                     isCoin = true
                                 end
                                 
-                                -- Check by color (common coin colors)
-                                local colorsToCheck = {
-                                    BrickColor.new("Bright yellow"),
-                                    BrickColor.new("Yellow"),
-                                    BrickColor.new("New Yeller"),
-                                    BrickColor.new("Gold"),
-                                    BrickColor.new("Bright orange")
-                                }
-                                for _, color in ipairs(colorsToCheck) do
-                                    if obj.BrickColor == color then
-                                        isCoin = true
-                                        break
-                                    end
-                                end
-                                
-                                -- Check if it's a collectible (common MM2 coin properties)
-                                if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") then
-                                    if obj.Size.X <= 3 and obj.Size.Y <= 3 and obj.Size.Z <= 3 then -- Small parts are likely coins
-                                        isCoin = true
-                                    end
-                                end
-                            end
-                            
-                            if isCoin then
-                                local distance = (obj.Position - hrp.Position).Magnitude
-                                if distance <= 500 then -- Increased range to 500 studs
-                                    table.insert(coinsFound, {
-                                        coin = obj,
-                                        distance = distance,
-                                        position = obj.Position
-                                    })
-                                end
-                            end
-                        end
-                        
-                        -- Sort coins by distance (closest first)
-                        table.sort(coinsFound, function(a, b)
-                            return a.distance < b.distance
-                        end)
-                        
-                        -- Teleport to each coin and collect it
-                        for _, coinData in ipairs(coinsFound) do
-                            if not getgenv().CoinAutoFarmEnabled then break end -- Stop if disabled mid-farming
-                            
-                            local coin = coinData.coin
-                            if coin and coin.Parent then -- Make sure coin still exists
-                                -- Teleport directly to coin
-                                hrp.Position = coin.Position
-                                task.wait(0.1)
-                                
-                                -- Try multiple collection methods
-                                -- Method 1: Touch the coin
-                                coin.CanCollide = false
-                                coin.Position = hrp.Position
-                                task.wait(0.1)
-                                
-                                -- Method 2: Fire touch events if they exist
-                                if coin:FindFirstChild("TouchTransmitter") then
-                                    for _, connection in ipairs(coin.TouchTransmitter:GetConnectedChildren()) do
-                                        if connection:IsA("RemoteEvent") then
-                                            connection:FireServer()
+                                -- Check by appearance (MM2 coins are typically small and yellow/gold)
+                                if not isCoin then
+                                    local coinColors = {
+                                        BrickColor.new("Bright yellow"),
+                                        BrickColor.new("Yellow"),
+                                        BrickColor.new("New Yeller"),
+                                        BrickColor.new("Gold"),
+                                        BrickColor.new("Bright orange"),
+                                        BrickColor.new("Pastel yellow")
+                                    }
+                                    
+                                    for _, color in ipairs(coinColors) do
+                                        if obj.BrickColor == color and obj.Size.X <= 5 and obj.Size.Y <= 5 and obj.Size.Z <= 5 then
+                                            isCoin = true
+                                            break
                                         end
                                     end
                                 end
                                 
-                                -- Method 3: Click if click detector exists
-                                if coin:FindFirstChild("ClickDetector") then
-                                    coin.ClickDetector.MaxActivationDistance = 100
-                                    fireclickdetector(coin.ClickDetector)
+                                -- Check if it has collection properties
+                                if not isCoin then
+                                    if obj:FindFirstChild("TouchTransmitter") or obj:FindFirstChild("ClickDetector") or obj:FindFirstChild("ProximityPrompt") then
+                                        if obj.Size.X <= 4 and obj.Size.Y <= 4 and obj.Size.Z <= 4 then
+                                            isCoin = true
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if isCoin and obj.Parent then
+                                -- CRITICAL: Check if still enabled before processing this coin
+                                if not getgenv().CoinAutoFarmEnabled then 
+                                    hrp.Position = originalPosition
+                                    break 
                                 end
                                 
-                                -- Small delay between coins
-                                task.wait(0.2)
-                                
-                                -- Check if coin was collected (removed from workspace)
-                                if not coin.Parent then
-                                    -- Coin successfully collected
-                                else
-                                    -- Try alternative collection method
-                                    hrp.Position = coin.Position + Vector3.new(0, 2, 0)
-                                    task.wait(0.1)
-                                    hrp.Position = coin.Position
+                                local distance = (obj.Position - hrp.Position).Magnitude
+                                if distance <= 1000 then -- Large range for collection
+                                    
+                                    -- METHOD 1: Direct teleport and touch
+                                    hrp.Position = obj.Position
+                                    task.wait(0.05)
+                                    
+                                    -- CRITICAL: Check if still enabled during multi-angle touching
+                                    local positions = {
+                                        obj.Position,
+                                        obj.Position + Vector3.new(0.5, 0, 0),
+                                        obj.Position - Vector3.new(0.5, 0, 0),
+                                        obj.Position + Vector3.new(0, 0.5, 0),
+                                        obj.Position - Vector3.new(0, 0.5, 0),
+                                        obj.Position + Vector3.new(0, 0, 0.5),
+                                        obj.Position - Vector3.new(0, 0, 0.5)
+                                    }
+                                    
+                                    for _, pos in ipairs(positions) do
+                                        if not getgenv().CoinAutoFarmEnabled then 
+                                            hrp.Position = originalPosition
+                                            break 
+                                        end
+                                        if not obj.Parent then break end -- Coin collected
+                                        hrp.Position = pos
+                                        task.wait(0.02)
+                                    end
+                                    
+                                    -- CRITICAL: Check if still enabled before event firing
+                                    if not getgenv().CoinAutoFarmEnabled then 
+                                        hrp.Position = originalPosition
+                                        break 
+                                    end
+                                    
+                                    -- METHOD 2: Fire touch events
+                                    if obj.Parent and obj:FindFirstChild("TouchTransmitter") then
+                                        local touch = obj:FindFirstChild("TouchTransmitter")
+                                        if touch and #touch:GetConnectedChildren() > 0 then
+                                            for _, connection in pairs(touch:GetConnectedChildren()) do
+                                                if connection:IsA("RemoteEvent") then
+                                                    connection:FireServer()
+                                                end
+                                            end
+                                        end
+                                    end
+                                    
+                                    -- METHOD 3: Click detector
+                                    if obj.Parent and obj:FindFirstChild("ClickDetector") then
+                                        local click = obj:FindFirstChild("ClickDetector")
+                                        click.MaxActivationDistance = 1000
+                                        fireclickdetector(click)
+                                    end
+                                    
+                                    -- METHOD 4: Proximity prompt
+                                    if obj.Parent and obj:FindFirstChild("ProximityPrompt") then
+                                        local prompt = obj:FindFirstChild("ProximityPrompt")
+                                        prompt.MaxActivationDistance = 1000
+                                        prompt:InputHoldEnded()
+                                    end
+                                    
+                                    -- METHOD 5: Force collection by changing properties
+                                    if obj.Parent then
+                                        obj.CanCollide = false
+                                        obj.Anchored = false
+                                        obj.Position = hrp.Position
+                                        task.wait(0.05)
+                                    end
+                                    
+                                    -- Check if coin was collected
+                                    if not obj.Parent then
+                                        coinsCollected = coinsCollected + 1
+                                    else
+                                        -- Last resort - try to remove it manually
+                                        obj:Destroy()
+                                        coinsCollected = coinsCollected + 1
+                                    end
+                                    
                                     task.wait(0.1)
                                 end
                             end
@@ -1059,11 +1098,42 @@ MiscTab:CreateToggle({
                         
                         -- Return to original position
                         hrp.Position = originalPosition
-                        task.wait(1) -- Wait before next cycle
+                        
+                        -- Notify if coins were collected
+                        if coinsCollected > 0 and Rayfield then
+                            Rayfield:Notify({
+                                Title = "Coin Auto Farm",
+                                Content = "Collected " .. coinsCollected .. " coins!",
+                                Duration = 2
+                            })
+                        end
+                        
+                        task.wait(2) -- Wait before next cycle
                     end)
-                    task.wait(3) -- Check every 3 seconds
+                    task.wait(1) -- Check every second
                 end
             end)()
+        else
+            -- CRITICAL: Immediately return to original position when disabled
+            pcall(function()
+                local localPlayer = game.Players.LocalPlayer
+                local char = localPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    -- Return to a safe position (ground level)
+                    hrp.Position = Vector3.new(hrp.Position.X, 100, hrp.Position.Z)
+                    task.wait(0.1)
+                    hrp.Position = Vector3.new(hrp.Position.X, workspace.CurrentCamera.Focus.Position.Y, hrp.Position.Z)
+                end
+            end)
+            
+            if Rayfield then
+                Rayfield:Notify({
+                    Title = "Coin Auto Farm",
+                    Content = "Farm stopped!",
+                    Duration = 2
+                })
+            end
         end
     end,
 })
@@ -1081,6 +1151,8 @@ MiscTab:CreateToggle({
                         local localPlayer = game.Players.LocalPlayer
                         local char = localPlayer.Character
                         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                        
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
                         
                         -- Check if Sheriff is dead
                         local sheriffDead = false
@@ -1103,47 +1175,106 @@ MiscTab:CreateToggle({
                         if sheriffDead then
                             local gunFound = false
                             local gunPosition = nil
+                            local gunObject = nil
                             
-                            -- Search for gun in workspace
+                            -- Search for gun in workspace with better detection
                             for _, obj in ipairs(workspace:GetDescendants()) do
                                 if obj:IsA("Tool") and obj.Name == "Gun" then
                                     gunFound = true
                                     gunPosition = obj:GetPrimaryPartCFrame().Position
+                                    gunObject = obj
                                     break
                                 end
                             end
                             
                             -- If gun found, teleport to it and grab it
-                            if gunFound and gunPosition then
-                                local originalPosition = char:FindFirstChild("HumanoidRootPart").Position
+                            if gunFound and gunPosition and gunObject then
+                                local originalPosition = hrp.Position
+                                local originalCFrame = hrp.CFrame
                                 
-                                -- Teleport to gun
-                                char:FindFirstChild("HumanoidRootPart").Position = gunPosition
-                                task.wait(0.5)
+                                -- TELEPORT TO GUN
+                                hrp.Position = gunPosition + Vector3.new(0, 2, 0) -- Slightly above gun
+                                task.wait(0.1)
                                 
-                                -- Try to grab the gun
-                                for _, obj in ipairs(workspace:GetDescendants()) do
-                                    if obj:IsA("Tool") and obj.Name == "Gun" then
-                                        if (obj:GetPrimaryPartCFrame().Position - gunPosition).Magnitude < 10 then
-                                            localPlayer.Character:FindFirstChild("Humanoid"):EquipTool(obj)
-                                            break
+                                -- Try to grab the gun - METHOD 1: Direct equip
+                                pcall(function()
+                                    localPlayer.Character:FindFirstChild("Humanoid"):EquipTool(gunObject)
+                                end)
+                                task.wait(0.2)
+                                
+                                -- METHOD 2: Touch the gun
+                                if gunObject.Parent then
+                                    hrp.Position = gunPosition
+                                    task.wait(0.1)
+                                    
+                                    -- Move around to ensure touch
+                                    local positions = {
+                                        gunPosition,
+                                        gunPosition + Vector3.new(1, 0, 0),
+                                        gunPosition - Vector3.new(1, 0, 0),
+                                        gunPosition + Vector3.new(0, 0, 1),
+                                        gunPosition - Vector3.new(0, 0, 1)
+                                    }
+                                    
+                                    for _, pos in ipairs(positions) do
+                                        if not gunObject.Parent then break end -- Gun picked up
+                                        hrp.Position = pos
+                                        task.wait(0.05)
+                                    end
+                                end
+                                
+                                -- METHOD 3: Fire touch events
+                                if gunObject.Parent and gunObject:FindFirstChild("Handle") then
+                                    local handle = gunObject:FindFirstChild("Handle")
+                                    if handle:FindFirstChild("TouchTransmitter") then
+                                        for _, connection in pairs(handle.TouchTransmitter:GetConnectedChildren()) do
+                                            if connection:IsA("RemoteEvent") then
+                                                connection:FireServer()
+                                            end
                                         end
                                     end
                                 end
                                 
+                                -- METHOD 4: Click detector
+                                if gunObject.Parent and gunObject:FindFirstChild("ClickDetector") then
+                                    fireclickdetector(gunObject:FindFirstChild("ClickDetector"))
+                                end
+                                
+                                -- METHOD 5: Force equip by moving to backpack
+                                if gunObject.Parent then
+                                    gunObject.Parent = localPlayer.Backpack
+                                    task.wait(0.1)
+                                    localPlayer.Character:FindFirstChild("Humanoid"):EquipTool(gunObject)
+                                end
+                                
                                 task.wait(0.3)
                                 
-                                -- Teleport back to original position
-                                char:FindFirstChild("HumanoidRootPart").Position = originalPosition
+                                -- TELEPORT BACK TO ORIGINAL POSITION
+                                hrp.Position = originalPosition
+                                hrp.CFrame = originalCFrame
                                 
-                                -- Disable after grabbing gun
-                                getgenv().AutoGrabGunEnabled = false
-                                if Rayfield then
-                                    Rayfield:Notify({
-                                        Title = "Auto Grab Gun",
-                                        Content = "Gun grabbed successfully!",
-                                        Duration = 3
-                                    })
+                                -- Check if gun was successfully grabbed
+                                local hasGun = char:FindFirstChild("Gun") or localPlayer.Backpack:FindFirstChild("Gun")
+                                
+                                if hasGun then
+                                    -- Success! Disable after grabbing gun
+                                    getgenv().AutoGrabGunEnabled = false
+                                    if Rayfield then
+                                        Rayfield:Notify({
+                                            Title = "Auto Grab Gun",
+                                            Content = "Gun grabbed successfully!",
+                                            Duration = 3
+                                        })
+                                    end
+                                else
+                                    -- Failed, try again next cycle
+                                    if Rayfield then
+                                        Rayfield:Notify({
+                                            Title = "Auto Grab Gun",
+                                            Content = "Failed to grab gun, retrying...",
+                                            Duration = 2
+                                        })
+                                    end
                                 end
                             end
                         end
@@ -1151,6 +1282,17 @@ MiscTab:CreateToggle({
                     task.wait(1) -- Check every second
                 end
             end)()
+        else
+            -- When disabled, ensure player is in safe position
+            pcall(function()
+                local localPlayer = game.Players.LocalPlayer
+                local char = localPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    -- Ensure player is on ground
+                    hrp.Position = Vector3.new(hrp.Position.X, workspace.CurrentCamera.Focus.Position.Y, hrp.Position.Z)
+                end
+            end)
         end
     end,
 })
