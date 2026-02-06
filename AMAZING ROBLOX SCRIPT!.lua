@@ -143,6 +143,7 @@ flyToggle.MouseButton1Click:Connect(function()
         local char = player.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local hrp = char.HumanoidRootPart
+            local flySpeed = 50 -- Added missing flySpeed variable
             
             getgenv().FlyBV = Instance.new("BodyVelocity")
             getgenv().FlyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
